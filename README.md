@@ -62,7 +62,7 @@ This repository contains a Verilog implementation of a RISC-V processor. The pro
 ### Installation
 1. Clone the repository:
    ```
-   git clone https://github.com/your-username/risc-v-processor.git
+   git clone https://github.com/muditbhargava66/RISC-V-Processor-Verilog-
    ```
 2. Open Xilinx Vivado and create a new project.
 3. Add the Verilog files from the `src/` directory to the project.
