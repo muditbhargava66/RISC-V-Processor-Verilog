@@ -16,6 +16,7 @@ This repository contains a RISC-V processor implemented in Verilog. The processo
 - [Memory Initialization](#memory-initialization)
 - [Contributing](#contributing)
 - [License](#license)
+- [Future Work](#planned-updates-and-future-work)
 
 ## Features
 - Implements a subset of the RISC-V ISA
@@ -136,3 +137,31 @@ Contributions to this RISC-V processor implementation are welcome. If you find a
 
 ## License
 This project is licensed under the [MIT License](LICENSE).
+
+## Planned Updates and Future Work
+
+### SVA (SystemVerilog Assertions)
+- [ ] Implement SystemVerilog Assertions (SVA) for better design verification and error checking.
+- [ ] Add assertion monitors to ensure the correct behavior of various modules and the overall processor.
+
+### Expanded Instruction Set Support
+- [ ] Extend the instruction set support to include additional RISC-V instructions and features.
+- [ ] Implement support for compressed instructions, vector extensions, and other advanced features.
+
+### Cache Coherence and Memory Hierarchy
+- [ ] Implement cache coherence protocols for multi-core or multi-processor systems.
+- [ ] Add support for multi-level cache hierarchies and advanced memory management techniques.
+
+### Performance Optimizations
+- [ ] Explore techniques for improving the processor's performance, such as branch prediction, speculation, and out-of-order execution.
+- [ ] Implement pipelining optimizations and hazard handling mechanisms.
+
+### Verification and Testing
+- [ ] Enhance the existing testbenches and create additional test cases for comprehensive verification.
+- [ ] Explore the use of formal verification techniques and tools for more rigorous design verification.
+
+### Documentation and Examples
+- [ ] Improve the documentation and provide more detailed explanations of the processor's architecture and design choices.
+- [ ] Include additional examples and use cases to help users better understand and utilize the processor.
+
+Note that these planned updates and future work are subject to change based on project priorities, resource availability, and community feedback.
