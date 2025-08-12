@@ -1,0 +1,386 @@
+# RISC-V Processor Project .gitignore
+# Comprehensive ignore file for Vivado, cross-platform development
+
+#######################################
+# Vivado Generated Files
+#######################################
+
+# Vivado project files (keep .xpr, ignore generated content)
+vivado_project/*.cache/
+vivado_project/*.hw/
+vivado_project/*.ip_user_files/
+vivado_project/*.runs/
+vivado_project/*.sim/
+vivado_project/*.srcs/utils_1/
+vivado_project/*.gen/
+vivado_project/.Xil/
+
+# Vivado logs and journals
+*.log
+*.jou
+*.str
+*.debug
+*.ltx
+
+# Vivado temporary files
+.Xil/
+usage_statistics_webtalk.*
+webtalk*.xml
+webtalk*.jou
+vivado*.backup.*
+vivado_pid*.str
+fsm_encoding.os
+
+# Vivado simulation files
+*.wdb
+*.wcfg
+*.vcd
+*.saif
+*.pb
+xsim.dir/
+*.protoinst
+
+# Implementation files (can be regenerated)
+*.bit
+*.bin
+*.mcs
+*.prm
+*.ltx
+*.dcp
+*.hwdef
+*.sysdef
+
+#######################################
+# Reports and Logs
+#######################################
+
+# Generated reports (optional - you might want to keep some)
+reports/*.rpt
+reports/*.xml
+reports/*.html
+reports/*.csv
+
+# Log files
+logs/*.log
+logs/*.jou
+
+# Timing and utilization reports
+*_timing_summary.rpt
+*_utilization.rpt
+*_power.rpt
+*_drc.rpt
+*_methodology.rpt
+*_route_status.rpt
+
+#######################################
+# Operating System Files
+#######################################
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+#######################################
+# Editor and IDE Files
+#######################################
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Eclipse
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders
+
+#######################################
+# Build and Compilation Files
+#######################################
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+
+#######################################
+# Python Files (for scripts)
+#######################################
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+#######################################
+# Documentation Build Files
+#######################################
+
+# Sphinx documentation
+docs/_build/
+
+# MkDocs documentation
+/site
+
+# LaTeX
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.idx
+*.ilg
+*.ind
+*.lof
+*.lot
+*.out
+*.toc
+*.synctex.gz
+*.nav
+*.snm
+*.vrb
+
+#######################################
+# Backup and Temporary Files
+#######################################
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+*.tmp
+
+# Temporary directories
+temp/
+tmp/
+temporary/
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+#######################################
+# Project Specific Ignores
+#######################################
+
+# Test outputs
+test_output/
+simulation_results/
+
+# Custom memory files (if auto-generated)
+# testbenches/imem_auto.txt
+# testbenches/dmem_auto.txt
+
+# Synthesis checkpoints (large files)
+*.dcp
+
+# Custom build directories
+build/
+output/
+
+#######################################
+# Keep These Important Files
+#######################################
+
+# Force include important files that might be ignored
+!.gitignore
+!README.md
+!Makefile
+!*.md
+!*.xdc
+!*.v
+!*.tcl
+!*.py
+!*.sh
+!*.bat
+!*.txt
+
+# Keep the main project file
+!vivado_project/*.xpr
+
+# Keep constraint files
+!constraints/
+!constraints/*.xdc
+
+# Keep source files
+!src/
+!src/*.v
+
+# Keep testbenches
+!testbenches/
+!testbenches/*.v
+!testbenches/*.txt
+
+# Keep scripts
+!scripts/
+!scripts/*.tcl
+!scripts/*.py
+!scripts/*.sh
+!scripts/*.bat
+
+# Keep documentation
+!docs/
+!*.md
+
+#######################################
+# Notes
+#######################################
+# This .gitignore is designed to:
+# 1. Keep source code, constraints, and scripts
+# 2. Ignore all generated/temporary files
+# 3. Support cross-platform development
+# 4. Allow easy project sharing and collaboration
+# 5. Prevent large binary files from being committed
+#
+# To add the project to git:
+# git init
+# git add .
+# git commit -m "Initial RISC-V processor implementation"
