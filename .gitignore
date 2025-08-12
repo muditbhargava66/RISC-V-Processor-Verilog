@@ -1,0 +1,71 @@
+# Vivado generated files
+*.jou
+*.log
+*.backup.jou
+*.backup.log
+*.str
+*.debug
+*.ltx
+*.tcl~
+
+# Vivado project directories
+projects/
+test_project/
+.Xil/
+*.cache/
+*.hw/
+*.ip_user_files/
+*.runs/
+*.sim/
+*.srcs/generated_sources/
+*.gen/
+
+# Synthesis and implementation reports (keep only key reports)
+reports/*.rpt
+!reports/utilization_synth.rpt
+!reports/timing_synth.rpt
+!reports/synthesis_summary.rpt
+
+# Bitstream files
+*.bit
+*.ltx
+*.mmi
+
+# Simulation files
+*.wdb
+*.wcfg
+*.vcd
+*.ghw
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.orig
+
+# Vivado IP files
+*.xci
+*.xcix
+
+# Vivado block design files
+*.bd
+
+# Vivado constraint files backup
+*.xdc.orig
+*.xdc.bak
