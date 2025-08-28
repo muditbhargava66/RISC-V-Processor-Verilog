@@ -1,4 +1,4 @@
-# RISC-V Processor v1.0.0 Makefile
+# RISC-V Processor v1.1.0 Makefile
 # Automation for build, test, clean, and deployment tasks
 
 # Project configuration
@@ -15,7 +15,7 @@ all: help
 .PHONY: help
 help:
 	@echo "========================================="
-	@echo "RISC-V Processor v1.0.0 Build System"
+	@echo "RISC-V Processor v1.1.0 Build System"
 	@echo "========================================="
 	@echo "Available targets:"
 	@echo ""
@@ -168,7 +168,7 @@ git-add: clean-logs
 .PHONY: git-commit
 git-commit: git-add
 	@echo "Committing changes..."
-	@git commit -m "feat: Production-ready RISC-V processor v1.0.0 with comprehensive testing and verification"
+	@git commit -m "feat: Updates for v1.1.0 with bug fixes and improved verification"
 
 # Utility targets
 .PHONY: check-vivado

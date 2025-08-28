@@ -1,17 +1,18 @@
 <div align = "center">
 
-# RISC-V Processor
+# RISC-V Processor v1.1.0
 
-[![Production Ready](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)](https://github.com/muditbhargava66/RISC-V-Processor-Verilog-)
+[![Improved](https://img.shields.io/badge/Status-Improved-brightgreen)](https://github.com/muditbhargava66/RISC-V-Processor-Verilog-)
 [![FPGA Verified](https://img.shields.io/badge/FPGA-Synthesized-blue)](https://github.com/muditbhargava66/RISC-V-Processor-Verilog-)
 [![RV32I Complete](https://img.shields.io/badge/ISA-RV32I%20Complete-orange)](https://github.com/muditbhargava66/RISC-V-Processor-Verilog-)
 
-**A complete, production-ready RISC-V RV32I processor implemented in Verilog. Successfully synthesized in Xilinx Vivado with excellent resource utilization and timing performance. Ready for FPGA deployment and educational use.**
+**A complete, improved, and more robust RISC-V RV32I processor implemented in Verilog. Successfully synthesized in Xilinx Vivado with excellent resource utilization and timing performance. Ready for FPGA deployment and educational use.**
 
 </div>
 
 ## Table of Contents
 - [Features](#-features)
+- [Changelog (v1.1.0)](#-changelog-v110)
 - [Directory Structure](#-directory-structure)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
@@ -31,12 +32,19 @@
 
 ## ✅ Features
 - **Complete RV32I Implementation**: All 37 RISC-V base integer instructions
-- **Production Ready**: Successfully synthesized in Vivado 2022.2
+- **Bug Fixes & Refactoring**: Corrected LUI instruction and optimized branch logic.
+- **Robust Verification**: Includes a new self-checking testbench for improved reliability.
+- **Flexible Program Loading**: Instruction memory can be loaded from a hex file.
 - **FPGA Optimized**: Single-cycle architecture for maximum clock speed
 - **Resource Efficient**: Only 911 LUTs, 128 FFs, 1 BRAM on Artix-7
 - **Timing Clean**: Meets 100MHz operation with positive slack
 - **Harvard Architecture**: Separate 1KB instruction and data memories
-- **Professional Quality**: Complete with constraints, scripts, and testbenches
+
+## 📖 Changelog (v1.1.0)
+- **Bug Fix**: Corrected a critical bug in the `LUI` instruction where it would write `0` instead of the immediate value.
+- **Refactoring**: Removed the redundant `branch_unit` and now use the ALU for branch condition evaluation. This simplifies the design and reduces resource usage.
+- **Enhanced Verification**: Replaced the previous testbench with a comprehensive, self-checking testbench (`riscv_processor_tb.v`) that verifies the correctness of register values against a test program.
+- **Flexible Memory**: The instruction memory is now loaded from `instruction_memory.hex` using `$readmemh`, allowing for easy testing of different programs without re-synthesis.
 
 ## 📁 Directory Structure
 ```
@@ -44,14 +52,14 @@
 │   ├── riscv_processor.v         # Top-level processor integration
 │   ├── alu.v                     # Arithmetic Logic Unit
 │   ├── register_file.v           # 32×32-bit register file
-│   ├── control_unit.v            # Instruction decoder
+│   ├── Control_unit.v            # Instruction decoder
 │   ├── immediate_generator.v     # Immediate value extraction
 │   ├── program_counter.v         # PC management
 │   ├── instruction_memory.v      # 1KB instruction storage
-│   ├── data_memory.v             # 1KB data storage
-│   └── branch_unit.v             # Branch condition evaluation
+│   └── data_memory.v             # 1KB data storage
 ├── testbenches/                  # Comprehensive verification suite
-│   ├── riscv_processor_tb.v      # Complete system testbench
+│   ├── riscv_processor_tb.v      # Self-checking system testbench
+│   ├── instruction_memory.hex    # Test program for simulation
 │   ├── alu_tb.v                  # ALU component test
 │   ├── control_unit_tb.v         # Control unit test
 │   ├── register_file_tb.v        # Register file test
@@ -152,23 +160,22 @@ vivado -mode batch -source scripts/run_synthesis.tcl
 - **32-bit RISC-V RV32I**: Complete base integer instruction set
 - **Single-Cycle Execution**: One instruction per clock cycle for predictable timing
 - **32 Registers**: x0-x31 with x0 hardwired to zero
-- **Memory**: 1KB instruction memory, 1KB data memory
+- **Memory**: 1KB instruction memory (loadable from file), 1KB data memory
 - **Addressing**: Byte-addressable memory with proper alignment
 
 ### Key Components
 1. **Program Counter (PC)**: Manages instruction sequencing
-2. **Instruction Memory**: 1KB ROM with test program
+2. **Instruction Memory**: 1KB ROM, loadable from a hex file for simulation.
 3. **Control Unit**: Decodes instructions and generates control signals
 4. **Register File**: 32×32-bit registers with x0=0
-5. **ALU**: Performs all arithmetic and logical operations
+5. **ALU**: Performs all arithmetic, logical, and branch comparison operations.
 6. **Immediate Generator**: Extracts and sign-extends immediates
 7. **Data Memory**: 1KB RAM with byte/halfword/word access
-8. **Branch Unit**: Evaluates branch conditions
 
 ## 🧪 Verification & Testing
 
-### Comprehensive Test Suite
-The processor includes a complete verification environment with multiple levels of testing:
+### Robust Verification Environment
+The processor includes an improved verification environment designed for robustness and accuracy:
 
 #### **Individual Component Tests**
 - **`alu_tb.v`**: Tests all 10 ALU operations with comprehensive test vectors
@@ -177,57 +184,20 @@ The processor includes a complete verification environment with multiple levels 
 - **`memory_tb.v`**: Validates instruction and data memory with all access types
 
 #### **System Integration Test**
-- **`riscv_processor_tb.v`**: Complete processor verification
-  - Tests built-in instruction sequence
-  - Monitors PC advancement and control flow
-  - Verifies branch and jump operations
-  - Checks system health and performance
-  - Includes timeout protection and performance monitoring
+- **`riscv_processor_tb.v`**: A self-checking testbench that runs a comprehensive test program (`instruction_memory.hex`) and verifies the final register state against expected values.
+  - **Test Program**: The test program covers a wide range of instructions, including arithmetic, logic, load/store, and control flow operations, specifically testing the LUI bugfix and the new branch logic.
+  - **Self-Checking**: The testbench automatically compares the contents of the register file at the end of the simulation with golden values, reporting a clear PASS or FAIL status.
+  - **Flexible**: Easily test new programs by modifying the `instruction_memory.hex` file.
 
-#### **Test Coverage**
-**✅ Component Level:**
-- ALU: All arithmetic, logical, and shift operations
-- Control Unit: Complete RV32I instruction set decoding
-- Register File: Read/write operations, reset behavior, x0 hardwiring
-- Memory: Byte, halfword, word access patterns (signed/unsigned)
+#### **Running the System Test**
+The primary method for verification is now through the self-checking system test.
 
-**✅ System Level:**
-- Instruction fetch and execution pipeline
-- Register-to-register and immediate operations
-- Memory load/store with proper alignment
-- Branch conditions and jump targets
-- PC management and control flow
-- Clock domain and reset functionality
-
-#### **Running Tests**
-
-**Individual Component Tests:**
 ```bash
-# Run specific component test
-vivado -mode batch -source testbenches/run_all_tests.tcl
-
-# Or run individual tests in Vivado GUI:
-# 1. Open project
-# 2. Set desired testbench as simulation top
-# 3. Run behavioral simulation
-```
-
-**Complete Test Suite:**
-```bash
-# Run all tests automatically
+# Run the self-checking system testbench
 cd testbenches
 vivado -mode batch -source run_all_tests.tcl
-
-# Expected output: All component and system tests pass
-# Total simulation time: ~10,000ns for complete test suite
 ```
-
-**Quick System Verification:**
-```bash
-# Run just the system test
-vivado -mode batch -source scripts/run_synthesis.tcl
-# Includes synthesis + system testbench execution
-```
+The script will create a Vivado project, load the processor and the test program, run the simulation, and print the verification results to the console. A successful run will end with an "ALL TESTS PASSED!" message.
 
 ## 📊 Synthesis Results (Vivado 2022.2)
 
@@ -268,20 +238,14 @@ vivado -mode batch -source scripts/generate_reports.tcl
 
 ## 🏆 Production Status
 
-### ✅ Version 1.0.0 Achievements
-- **Complete Implementation**: All 37 RV32I instructions working
-- **FPGA Verified**: Successfully synthesized in Vivado 2022.2
-- **Timing Clean**: Meets 100MHz operation with positive slack
-- **Resource Efficient**: Optimized for Artix-7 FPGA family
-- **Production Ready**: Professional code quality and documentation
-- **Deployment Ready**: Can be immediately programmed to FPGA
-
-### Quality Assurance
-- **Synthesis**: Zero errors, zero critical warnings
-- **Simulation**: All instructions verified in testbench
-- **Timing**: Setup and hold requirements met
-- **Resource**: Efficient utilization under 5% LUT usage
-- **Documentation**: Complete with examples and usage guides
+### ✅ Version 1.1.0 Achievements
+- **Improved Correctness**: Fixed critical bug in LUI instruction.
+- **Efficient Design**: Refactored branch logic to be more efficient and simpler.
+- **Robust Verification**: Implemented a comprehensive self-checking testbench.
+- **Enhanced Usability**: Processor can now be tested with any program via a hex file.
+- **FPGA Verified**: Successfully synthesized in Vivado 2022.2.
+- **Timing Clean**: Meets 100MHz operation with positive slack.
+- **Resource Efficient**: Optimized for Artix-7 FPGA family.
 
 ## 🔮 Future Enhancements
 

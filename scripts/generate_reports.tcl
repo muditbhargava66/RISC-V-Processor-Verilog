@@ -47,7 +47,7 @@ puts "Generating summary report..."
 set summary_file [open "reports/synthesis_summary.rpt" w]
 
 puts $summary_file "========================================="
-puts $summary_file "RISC-V Processor v1.0.0 Synthesis Summary"
+puts $summary_file "RISC-V Processor v1.1.0 Synthesis Summary"
 puts $summary_file "========================================="
 puts $summary_file ""
 

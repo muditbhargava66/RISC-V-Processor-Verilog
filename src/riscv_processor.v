@@ -112,6 +112,8 @@ module riscv_processor (
                          32'h00000000;                          // Default
     
     // ALU
+    // The alu.v module already provides a 'zero' flag output, which is used for branch evaluation.
+    // No modification to the ALU was necessary.
     alu alu_inst (
         .operand_a(alu_operand1),
         .operand_b(alu_operand2),

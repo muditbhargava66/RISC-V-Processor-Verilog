@@ -1,5 +1,5 @@
-# RISC-V Processor v1.0.0 Vivado Build Script
-# Production-ready build for version 1.0.0
+# RISC-V Processor v1.1.0 Vivado Build Script
+# Production-ready build for version 1.1.0
 
 # Close any existing projects
 catch {close_project -quiet}
@@ -36,11 +36,10 @@ add_files -norecurse {
     ./src/program_counter.v
     ./src/instruction_memory.v
     ./src/register_file.v
-    ./src/control_unit.v
+    ./src/Control_unit.v
     ./src/immediate_generator.v
     ./src/alu.v
     ./src/data_memory.v
-    ./src/branch_unit.v
 }
 
 # Add constraint files
