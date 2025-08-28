@@ -1,8 +1,11 @@
 // Data Memory Module
-// 1KB data memory with byte, halfword, and word access
+// Parameterized data memory with byte, halfword, and word access
 
-module data_memory (
+module data_memory #(
+    parameter ADDR_WIDTH = 8 // Number of bits for word address, default = 256 words
+)(
     input wire clk,
+    input wire reset,
     input wire mem_read,
     input wire mem_write,
     input wire [31:0] address,
@@ -11,24 +14,23 @@ module data_memory (
     output reg [31:0] read_data
 );
 
-    // Data memory - 1KB (256 words)
-    reg [31:0] memory [0:255];
+    // Data memory
+    localparam MEM_DEPTH = 2**ADDR_WIDTH;
+    reg [31:0] memory [0:MEM_DEPTH-1];
     
     // Word-aligned address (divide by 4)
-    wire [7:0] word_address = address[9:2];
+    wire [ADDR_WIDTH-1:0] word_address = address[ADDR_WIDTH+1:2];
     wire [1:0] byte_offset = address[1:0];
     
-    // Initialize memory to zero
     integer i;
-    initial begin
-        for (i = 0; i < 256; i = i + 1) begin
-            memory[i] = 32'h00000000;
-        end
-    end
     
-    // Write operation
-    always @(posedge clk) begin
-        if (mem_write) begin
+    // Write operation with asynchronous reset
+    always @(posedge clk or posedge reset) begin
+        if (reset) begin
+            for (i = 0; i < MEM_DEPTH; i = i + 1) begin
+                memory[i] <= 32'h00000000;
+            end
+        end else if (mem_write) begin
             case (funct3)
                 3'b000: begin // SB (Store Byte)
                     case (byte_offset)
@@ -39,7 +41,9 @@ module data_memory (
                     endcase
                 end
                 3'b001: begin // SH (Store Halfword)
-                    if (byte_offset[0] == 1'b0) begin
+                    if (byte_offset[0] != 0) begin
+                        $display("ERROR: Misaligned store halfword at address %h", address);
+                    end else begin
                         if (byte_offset[1] == 1'b0)
                             memory[word_address][15:0] <= write_data[15:0];
                         else
@@ -47,7 +51,9 @@ module data_memory (
                     end
                 end
                 3'b010: begin // SW (Store Word)
-                    if (byte_offset == 2'b00)
+                    if (byte_offset != 2'b00)
+                        $display("ERROR: Misaligned store word at address %h", address);
+                    else
                         memory[word_address] <= write_data;
                 end
             endcase
@@ -68,7 +74,10 @@ module data_memory (
                     endcase
                 end
                 3'b001: begin // LH (Load Halfword)
-                    if (byte_offset[0] == 1'b0) begin
+                    if (byte_offset[0] != 0) begin
+                        $display("ERROR: Misaligned load halfword at address %h", address);
+                        read_data = 32'h0;
+                    end else begin
                         if (byte_offset[1] == 1'b0)
                             read_data = {{16{memory[word_address][15]}}, memory[word_address][15:0]};
                         else
@@ -76,8 +85,12 @@ module data_memory (
                     end
                 end
                 3'b010: begin // LW (Load Word)
-                    if (byte_offset == 2'b00)
+                    if (byte_offset != 2'b00) begin
+                        $display("ERROR: Misaligned load word at address %h", address);
+                        read_data = 32'h0;
+                    end else begin
                         read_data = memory[word_address];
+                    end
                 end
                 3'b100: begin // LBU (Load Byte Unsigned)
                     case (byte_offset)
@@ -88,7 +101,10 @@ module data_memory (
                     endcase
                 end
                 3'b101: begin // LHU (Load Halfword Unsigned)
-                    if (byte_offset[0] == 1'b0) begin
+                    if (byte_offset[0] != 0) begin
+                        $display("ERROR: Misaligned load halfword unsigned at address %h", address);
+                        read_data = 32'h0;
+                    end else begin
                         if (byte_offset[1] == 1'b0)
                             read_data = {16'h0000, memory[word_address][15:0]};
                         else

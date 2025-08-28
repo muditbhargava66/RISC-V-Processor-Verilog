@@ -31,14 +31,15 @@
 - [License](#-license)
 
 ## ✅ Features
-- **Complete RV32I Implementation**: All 37 RISC-V base integer instructions
+- **Complete RV32I Implementation**: All 37 RISC-V base integer instructions.
+- **Configurable Memory**: Instruction and data memory sizes can be easily configured using Verilog parameters.
+- **Robust Memory Access**: Data memory includes simulation-time checks for misaligned load/store operations, improving software development reliability.
 - **Bug Fixes & Refactoring**: Corrected LUI instruction and optimized branch logic.
-- **Robust Verification**: Includes a new self-checking testbench for improved reliability.
-- **Flexible Program Loading**: Instruction memory can be loaded from a hex file.
-- **FPGA Optimized**: Single-cycle architecture for maximum clock speed
-- **Resource Efficient**: Only 911 LUTs, 128 FFs, 1 BRAM on Artix-7
-- **Timing Clean**: Meets 100MHz operation with positive slack
-- **Harvard Architecture**: Separate 1KB instruction and data memories
+- **Robust Verification**: Includes a comprehensive, self-checking testbench.
+- **Flexible Program Loading**: Instruction memory can be loaded from a hex file for easy testing.
+- **FPGA Optimized**: Single-cycle architecture with proper resets on all state elements.
+- **Resource Efficient**: Low resource footprint on Artix-7 FPGAs.
+- **Timing Clean**: Meets 100MHz operation with positive slack.
 
 ## 📖 Changelog (v1.1.0)
 - **Bug Fix**: Corrected a critical bug in the `LUI` instruction where it would write `0` instead of the immediate value.

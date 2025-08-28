@@ -125,6 +125,7 @@ module riscv_processor (
     // Data Memory
     data_memory dmem_inst (
         .clk(clk),
+        .reset(reset),
         .mem_read(mem_read),
         .mem_write(mem_write),
         .address(alu_result),

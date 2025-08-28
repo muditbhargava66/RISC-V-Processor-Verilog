@@ -46,13 +46,12 @@ module riscv_processor_tb;
         // Check final register values
         // To access internal signals, we use hierarchical names.
         // This requires the simulator to have appropriate permissions.
-        check_register(1, 32'hDEADBF00, "LUI + ADDI", errors);
-        check_register(2, 32'hDEADBF00, "SW + LW", errors);
-        check_register(3, 32'd5, "ADDI", errors);
-        check_register(4, 32'd10, "ADDI", errors);
-        check_register(5, 32'd15, "ADD (after failed BEQ)", errors);
-        check_register(6, 32'd0, "Skipped instruction (after BNE)", errors);
-        check_register(7, 32'd5, "SUB (at branch target)", errors);
+        check_register(1, 32'hDEAD0234, "LUI + ADDI", errors);
+        check_register(2, 32'hDEAD0234, "SW + LW", errors);
+        check_register(3, 32'hFFFFFFFF, "ADDI negative", errors);
+        check_register(4, 32'd1, "ADDI positive", errors);
+        check_register(5, 32'd2, "Branch Taken (BLT)", errors);
+        check_register(6, 32'd2, "Branch Not Taken (BGE)", errors);
 
         $display("----------------------------------------");
 
