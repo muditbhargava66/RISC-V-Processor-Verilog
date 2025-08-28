@@ -18,6 +18,7 @@ module riscv_processor (
     wire [31:0] alu_operand1, alu_operand2, alu_result;
     wire [31:0] mem_read_data;
     wire [31:0] reg_write_data;
+    wire alu_zero;
     wire branch_taken;
     
     // Control signals
@@ -50,10 +51,17 @@ module riscv_processor (
     assign pc_plus_4 = pc_current + 32'd4;
     
     // PC next calculation
-    assign pc_next = branch_taken ? 
-                     (jump && (opcode == 7'b1100111)) ? alu_result :  // JALR: rs1 + immediate
-                     (jump && (opcode == 7'b1101111)) ? (pc_current + immediate) : // JAL: PC + immediate
-                     (pc_current + immediate) :  // Branch: PC + immediate
+    wire beq_cond = (funct3 == 3'b000) & alu_zero;
+    wire bne_cond = (funct3 == 3'b001) & ~alu_zero;
+    wire blt_cond = (funct3 == 3'b100) & alu_result[0];
+    wire bge_cond = (funct3 == 3'b101) & ~alu_result[0];
+    wire bltu_cond = (funct3 == 3'b110) & alu_result[0];
+    wire bgeu_cond = (funct3 == 3'b111) & ~alu_result[0];
+    assign branch_taken = branch & (beq_cond | bne_cond | blt_cond | bge_cond | bltu_cond | bgeu_cond);
+
+    wire [31:0] jump_target = (opcode == 7'b1101111) ? (pc_current + immediate) : alu_result; // JAL or JALR
+    assign pc_next = jump ? jump_target :
+                     branch_taken ? (pc_current + immediate) :
                      pc_plus_4;
     
     // Instruction Memory
@@ -109,7 +117,7 @@ module riscv_processor (
         .operand_b(alu_operand2),
         .alu_control(alu_op),
         .result(alu_result),
-        .zero() // Not used in single-cycle implementation
+        .zero(alu_zero)
     );
     
     // Data Memory
@@ -124,19 +132,11 @@ module riscv_processor (
     );
     
     // Register write data selection
-    assign reg_write_data = (reg_write_src == 2'b00) ? alu_result :     // ALU result
-                           (reg_write_src == 2'b01) ? mem_read_data :   // Memory data
-                           (reg_write_src == 2'b10) ? pc_plus_4 :       // PC+4
-                           32'h00000000;                                // Default
+    // reg_write_src map: 00:ALU, 01:MEM, 10:PC+4, 11:IMM
+    assign reg_write_data = (reg_write_src == 2'b00) ? alu_result :    // ALU result
+                           (reg_write_src == 2'b01) ? mem_read_data :  // Memory data
+                           (reg_write_src == 2'b10) ? pc_plus_4 :      // PC+4
+                           (reg_write_src == 2'b11) ? immediate :      // Immediate
+                           32'h00000000;                               // Default
     
-    // Branch Unit
-    branch_unit branch_inst (
-        .funct3(funct3),
-        .operand1(read_data1),
-        .operand2(read_data2),
-        .branch(branch),
-        .jump(jump),
-        .branch_taken(branch_taken)
-    );
-
 endmodule

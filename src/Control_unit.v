@@ -15,6 +15,12 @@ module control_unit (
     output reg [1:0] reg_write_src
 );
 
+    // Register write source
+    localparam [1:0] WRITE_SRC_ALU = 2'b00;
+    localparam [1:0] WRITE_SRC_MEM = 2'b01;
+    localparam [1:0] WRITE_SRC_PC_PLUS_4 = 2'b10;
+    localparam [1:0] WRITE_SRC_IMM = 2'b11;
+
     // RISC-V opcodes
     localparam [6:0] OPCODE_R_TYPE  = 7'b0110011;
     localparam [6:0] OPCODE_I_TYPE  = 7'b0010011;
@@ -47,13 +53,13 @@ module control_unit (
         jump = 1'b0;
         alu_src = 2'b00;
         alu_op = ALU_ADD;
-        reg_write_src = 2'b00;
+        reg_write_src = WRITE_SRC_ALU;
 
         case (opcode)
             OPCODE_R_TYPE: begin
                 reg_write = 1'b1;
                 alu_src = 2'b00; // Register
-                reg_write_src = 2'b00; // ALU result
+                reg_write_src = WRITE_SRC_ALU; // ALU result
                 case ({funct7, funct3})
                     {7'b0000000, 3'b000}: alu_op = ALU_ADD;  // ADD
                     {7'b0100000, 3'b000}: alu_op = ALU_SUB;  // SUB
@@ -72,7 +78,7 @@ module control_unit (
             OPCODE_I_TYPE: begin
                 reg_write = 1'b1;
                 alu_src = 2'b01; // Immediate
-                reg_write_src = 2'b00; // ALU result
+                reg_write_src = WRITE_SRC_ALU; // ALU result
                 case (funct3)
                     3'b000: alu_op = ALU_ADD;  // ADDI
                     3'b010: alu_op = ALU_SLT;  // SLTI
@@ -94,7 +100,7 @@ module control_unit (
                 mem_read = 1'b1;
                 alu_src = 2'b01; // Immediate
                 alu_op = ALU_ADD;
-                reg_write_src = 2'b01; // Memory data
+                reg_write_src = WRITE_SRC_MEM; // Memory data
             end
 
             OPCODE_STORE: begin
@@ -120,7 +126,7 @@ module control_unit (
             OPCODE_JAL: begin
                 reg_write = 1'b1;
                 jump = 1'b1;
-                reg_write_src = 2'b10; // PC + 4
+                reg_write_src = WRITE_SRC_PC_PLUS_4; // PC + 4
             end
 
             OPCODE_JALR: begin
@@ -128,19 +134,19 @@ module control_unit (
                 jump = 1'b1;
                 alu_src = 2'b01; // Immediate
                 alu_op = ALU_ADD;
-                reg_write_src = 2'b10; // PC + 4
+                reg_write_src = WRITE_SRC_PC_PLUS_4; // PC + 4
             end
 
             OPCODE_LUI: begin
                 reg_write = 1'b1;
-                reg_write_src = 2'b11; // Immediate
+                reg_write_src = WRITE_SRC_IMM; // Immediate
             end
 
             OPCODE_AUIPC: begin
                 reg_write = 1'b1;
                 alu_src = 2'b10; // PC
                 alu_op = ALU_ADD;
-                reg_write_src = 2'b00; // ALU result
+                reg_write_src = WRITE_SRC_ALU; // ALU result
             end
 
             default: begin
