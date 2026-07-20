@@ -7,6 +7,7 @@ module memory_tb;
 
     // Clock for data memory
     reg clk;
+    reg reset;
     
     // Instruction memory signals
     reg [31:0] imem_address;
@@ -37,6 +38,7 @@ module memory_tb;
     
     data_memory dmem (
         .clk(clk),
+        .reset(reset),
         .mem_read(mem_read),
         .mem_write(mem_write),
         .address(dmem_address),
@@ -74,13 +76,13 @@ module memory_tb;
         input [79:0] test_name;
         begin
             // Write operation
-            @(posedge clk);
             mem_write = 1;
             mem_read = 0;
             dmem_address = addr;
             write_data = wr_data;
             funct3 = f3;
-            
+            @(posedge clk);
+            // write captured on this edge
             @(posedge clk);
             mem_write = 0;
             
@@ -113,6 +115,12 @@ module memory_tb;
         write_data = 0;
         funct3 = 0;
         imem_address = 0;
+        
+        // Reset sequence
+        reset = 1;
+        @(posedge clk);
+        @(posedge clk);
+        reset = 0;
         
         @(posedge clk);
         

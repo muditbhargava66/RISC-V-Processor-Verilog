@@ -28,6 +28,7 @@ module compliance_tests;
     integer test_count = 0;
     integer pass_count = 0;
     integer fail_count = 0;
+    integer skip_count = 0;
     
     // Clock generation
     initial begin
@@ -83,16 +84,25 @@ module compliance_tests;
             // Test R-type format recognition
             if (instruction_debug[6:0] == 7'b0110011) begin
                 run_compliance_test("R-type format recognition", 1'b1, 1'b1);
+            end else begin
+                skip_count = skip_count + 1;
+                $display("SKIP: R-type format recognition (opcode not observed at sample point)");
             end
             
             // Test I-type format recognition
             if (instruction_debug[6:0] == 7'b0010011) begin
                 run_compliance_test("I-type format recognition", 1'b1, 1'b1);
+            end else begin
+                skip_count = skip_count + 1;
+                $display("SKIP: I-type format recognition (opcode not observed at sample point)");
             end
             
             // Test branch format recognition
             if (instruction_debug[6:0] == 7'b1100011) begin
                 run_compliance_test("Branch format recognition", 1'b1, 1'b1);
+            end else begin
+                skip_count = skip_count + 1;
+                $display("SKIP: Branch format recognition (opcode not observed at sample point)");
             end
         end
     endtask
@@ -260,19 +270,23 @@ module compliance_tests;
         // Final compliance report
         $display("========================================");
         $display("RISC-V Compliance Test Results:");
-        $display("Total Tests: %0d", test_count);
+        $display("Total Checks: %0d", test_count + skip_count);
         $display("Passed: %0d", pass_count);
         $display("Failed: %0d", fail_count);
+        $display("Skipped: %0d", skip_count);
         
         if (fail_count == 0) begin
-            $display("SUCCESS: All compliance tests passed!");
-            $display("Processor is RV32I compliant!");
+            $display("All executed smoke checks passed.");
+            $display("NOTE: This is a directed test only, not an RV32I certification.");
         end else begin
             $display("WARNING: %0d compliance tests failed", fail_count);
             $display("Review implementation for RV32I compliance");
         end
         
-        $display("Compliance Rate: %0.1f%%", (pass_count * 100.0) / test_count);
+        if (test_count > 0)
+            $display("Pass Rate (of executed checks): %0.1f%%", (pass_count * 100.0) / test_count);
+        else
+            $display("No checks were executed.");
         $display("========================================");
         
         $finish;

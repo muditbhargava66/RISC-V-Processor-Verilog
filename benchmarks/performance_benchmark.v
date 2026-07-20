@@ -32,6 +32,8 @@ module performance_benchmark;
     integer load_count = 0;
     integer store_count = 0;
     integer alu_op_count = 0;
+    integer nop_streak = 0;
+    reg program_end_detected = 1'b0;
     
     // Timing measurements
     real start_time = 0.0;
@@ -77,30 +79,47 @@ module performance_benchmark;
         end else begin
             total_cycles = total_cycles + 1;
             
-            // Count instructions (PC changes indicate new instruction)
-            if (pc_debug != prev_pc || total_cycles == 1) begin
-                instruction_count = instruction_count + 1;
-                
-                // Classify instruction types
-                case (instruction_debug[6:0])
-                    7'b1100011: begin // Branch
-                        branch_count = branch_count + 1;
-                        if (branch_taken_debug) begin
-                            branch_taken_count = branch_taken_count + 1;
+            if (!program_end_detected) begin
+                // Count instructions (PC changes indicate new instruction)
+                if (pc_debug != prev_pc || total_cycles == 1) begin
+                    instruction_count = instruction_count + 1;
+                    
+                    // Classify instruction types
+                    case (instruction_debug[6:0])
+                        7'b1100011: begin // Branch
+                            branch_count = branch_count + 1;
+                            if (branch_taken_debug) begin
+                                branch_taken_count = branch_taken_count + 1;
+                            end
                         end
-                    end
-                    7'b0000011: begin // Load
-                        load_count = load_count + 1;
-                    end
-                    7'b0100011: begin // Store
-                        store_count = store_count + 1;
-                    end
-                    7'b0110011, 7'b0010011: begin // R-type, I-type ALU
-                        alu_op_count = alu_op_count + 1;
-                    end
-                endcase
+                        7'b0000011: begin // Load
+                            load_count = load_count + 1;
+                        end
+                        7'b0100011: begin // Store
+                            store_count = store_count + 1;
+                        end
+                        7'b0110011, 7'b0010011: begin // R-type, I-type ALU
+                            alu_op_count = alu_op_count + 1;
+                        end
+                    endcase
+                end
             end
             prev_pc <= pc_debug;
+            
+            // Detect program end: consecutive NOPs/zero instructions
+            if (instruction_debug == 32'h00000013 || instruction_debug == 32'h00000000) begin
+                nop_streak = nop_streak + 1;
+                if (nop_streak >= 3) begin
+                    if (!program_end_detected) begin
+                        program_end_detected = 1'b1;
+                        // Subtract the NOP streak from instruction count
+                        instruction_count = instruction_count - nop_streak;
+                        $display("Program end detected after %0d real instructions", instruction_count);
+                    end
+                end
+            end else begin
+                nop_streak = 0;
+            end
         end
     end
     
@@ -149,24 +168,16 @@ module performance_benchmark;
             $display("");
             
             $display("Performance Targets:");
-            $display("- Target IPC: 1.000 (Single-cycle) - %s", 
-                    (ipc >= 0.95) ? "PASS" : "FAIL");
+            $display("- Diagnostic IPC over bounded program: %0.3f", ipc);
             $display("- Target Frequency: 100 MHz - %s", 
                     (clock_frequency >= 100.0) ? "PASS" : "FAIL");
             $display("- Target Throughput: >90 MIPS - %s",
                     ((instruction_count / (execution_time / 1000.0)) >= 90.0) ? "PASS" : "FAIL");
             $display("");
             
-            // Performance grade
-            if (ipc >= 0.95 && clock_frequency >= 100.0) begin
-                $display("PERFORMANCE GRADE: EXCELLENT");
-            end else if (ipc >= 0.90 && clock_frequency >= 90.0) begin
-                $display("PERFORMANCE GRADE: GOOD");
-            end else if (ipc >= 0.80 && clock_frequency >= 80.0) begin
-                $display("PERFORMANCE GRADE: ACCEPTABLE");
-            end else begin
-                $display("PERFORMANCE GRADE: NEEDS IMPROVEMENT");
-            end
+            // Performance note
+            $display("NOTE: This is a diagnostic metric over the bounded program region.");
+            $display("      It is not a sustained processor performance measurement.");
             
             $display("========================================");
         end

@@ -3,7 +3,7 @@
 
 # Project configuration
 set project_name "riscv_processor_quartus"
-set project_dir "./projects/quartus"
+set project_dir "./build/quartus"
 set device_family "Cyclone V"
 set device_part "5CGXFC7C7F23C8"
 
@@ -55,11 +55,11 @@ puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/riscv_process
 puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/program_counter.v"
 puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/instruction_memory.v"
 puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/register_file.v"
-puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/control_unit.v"
+puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/Control_unit.v"
 puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/immediate_generator.v"
 puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/alu.v"
 puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/data_memory.v"
-puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/branch_unit.v"
+puts $qsf_file "set_global_assignment -name HEX_FILE ../../instruction_memory.hex"
 
 # Add constraint files
 puts $qsf_file ""

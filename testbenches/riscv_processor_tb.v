@@ -8,10 +8,23 @@ module riscv_processor_tb;
     reg reset;
     integer errors;
 
-    // Instantiate the DUT
+    // Instantiate the DUT — all debug ports explicitly unconnected
     riscv_processor dut (
         .clk(clk),
-        .reset(reset)
+        .reset(reset),
+        .pc_debug(),
+        .instruction_debug(),
+        .alu_result_debug(),
+        .reg_debug_data1(),
+        .reg_debug_data2(),
+        .mem_debug_data(),
+        .reg_debug_addr1(),
+        .reg_debug_addr2(),
+        .immediate_debug(),
+        .reg_write_debug(),
+        .mem_read_debug(),
+        .mem_write_debug(),
+        .branch_taken_debug()
     );
 
     // Clock generation - 100MHz

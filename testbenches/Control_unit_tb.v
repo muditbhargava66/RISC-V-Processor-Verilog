@@ -15,6 +15,7 @@ module control_unit_tb;
     wire branch;
     wire jump;
     wire [1:0] alu_src;
+    wire alu_src1;
     wire [3:0] alu_op;
     wire [1:0] reg_write_src;
     
@@ -31,6 +32,7 @@ module control_unit_tb;
         .mem_write(mem_write),
         .branch(branch),
         .jump(jump),
+        .alu_src1(alu_src1),
         .alu_src(alu_src),
         .alu_op(alu_op),
         .reg_write_src(reg_write_src)
@@ -46,6 +48,7 @@ module control_unit_tb;
         input expected_mem_write;
         input expected_branch;
         input expected_jump;
+        input expected_alu_src1;
         input [1:0] expected_alu_src;
         input [3:0] expected_alu_op;
         input [1:0] expected_reg_write_src;
@@ -62,6 +65,7 @@ module control_unit_tb;
                 mem_write == expected_mem_write &&
                 branch == expected_branch &&
                 jump == expected_jump &&
+                alu_src1 == expected_alu_src1 &&
                 alu_src == expected_alu_src &&
                 alu_op == expected_alu_op &&
                 reg_write_src == expected_reg_write_src) begin
@@ -69,13 +73,13 @@ module control_unit_tb;
                 $display("PASS: %s", inst_name);
             end else begin
                 $display("FAIL: %s", inst_name);
-                $display("   Expected: rw=%b mr=%b mw=%b br=%b jmp=%b as=%b ao=%b rws=%b",
+                $display("   Expected: rw=%b mr=%b mw=%b br=%b jmp=%b as1=%b as=%b ao=%b rws=%b",
                         expected_reg_write, expected_mem_read, expected_mem_write,
-                        expected_branch, expected_jump, expected_alu_src,
-                        expected_alu_op, expected_reg_write_src);
-                $display("   Got:      rw=%b mr=%b mw=%b br=%b jmp=%b as=%b ao=%b rws=%b",
+                        expected_branch, expected_jump, expected_alu_src1,
+                        expected_alu_src, expected_alu_op, expected_reg_write_src);
+                $display("   Got:      rw=%b mr=%b mw=%b br=%b jmp=%b as1=%b as=%b ao=%b rws=%b",
                         reg_write, mem_read, mem_write, branch, jump,
-                        alu_src, alu_op, reg_write_src);
+                        alu_src1, alu_src, alu_op, reg_write_src);
             end
         end
     endtask
@@ -86,52 +90,52 @@ module control_unit_tb;
         $display("========================================");
         
         // R-type instructions
-        test_instruction(7'b0110011, 3'b000, 7'b0000000, 1, 0, 0, 0, 0, 2'b00, 4'b0000, 2'b00, "ADD");
-        test_instruction(7'b0110011, 3'b000, 7'b0100000, 1, 0, 0, 0, 0, 2'b00, 4'b1000, 2'b00, "SUB");
-        test_instruction(7'b0110011, 3'b001, 7'b0000000, 1, 0, 0, 0, 0, 2'b00, 4'b0001, 2'b00, "SLL");
-        test_instruction(7'b0110011, 3'b010, 7'b0000000, 1, 0, 0, 0, 0, 2'b00, 4'b0010, 2'b00, "SLT");
-        test_instruction(7'b0110011, 3'b011, 7'b0000000, 1, 0, 0, 0, 0, 2'b00, 4'b0011, 2'b00, "SLTU");
-        test_instruction(7'b0110011, 3'b100, 7'b0000000, 1, 0, 0, 0, 0, 2'b00, 4'b0100, 2'b00, "XOR");
-        test_instruction(7'b0110011, 3'b101, 7'b0000000, 1, 0, 0, 0, 0, 2'b00, 4'b0101, 2'b00, "SRL");
-        test_instruction(7'b0110011, 3'b101, 7'b0100000, 1, 0, 0, 0, 0, 2'b00, 4'b1101, 2'b00, "SRA");
-        test_instruction(7'b0110011, 3'b110, 7'b0000000, 1, 0, 0, 0, 0, 2'b00, 4'b0110, 2'b00, "OR");
-        test_instruction(7'b0110011, 3'b111, 7'b0000000, 1, 0, 0, 0, 0, 2'b00, 4'b0111, 2'b00, "AND");
+        test_instruction(7'b0110011, 3'b000, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b00, 4'b0000, 2'b00, "ADD");
+        test_instruction(7'b0110011, 3'b000, 7'b0100000, 1, 0, 0, 0, 0, 1'b0, 2'b00, 4'b1000, 2'b00, "SUB");
+        test_instruction(7'b0110011, 3'b001, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b00, 4'b0001, 2'b00, "SLL");
+        test_instruction(7'b0110011, 3'b010, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b00, 4'b0010, 2'b00, "SLT");
+        test_instruction(7'b0110011, 3'b011, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b00, 4'b0011, 2'b00, "SLTU");
+        test_instruction(7'b0110011, 3'b100, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b00, 4'b0100, 2'b00, "XOR");
+        test_instruction(7'b0110011, 3'b101, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b00, 4'b0101, 2'b00, "SRL");
+        test_instruction(7'b0110011, 3'b101, 7'b0100000, 1, 0, 0, 0, 0, 1'b0, 2'b00, 4'b1101, 2'b00, "SRA");
+        test_instruction(7'b0110011, 3'b110, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b00, 4'b0110, 2'b00, "OR");
+        test_instruction(7'b0110011, 3'b111, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b00, 4'b0111, 2'b00, "AND");
         
         // I-type instructions
-        test_instruction(7'b0010011, 3'b000, 7'b0000000, 1, 0, 0, 0, 0, 2'b01, 4'b0000, 2'b00, "ADDI");
-        test_instruction(7'b0010011, 3'b010, 7'b0000000, 1, 0, 0, 0, 0, 2'b01, 4'b0010, 2'b00, "SLTI");
-        test_instruction(7'b0010011, 3'b011, 7'b0000000, 1, 0, 0, 0, 0, 2'b01, 4'b0011, 2'b00, "SLTIU");
-        test_instruction(7'b0010011, 3'b100, 7'b0000000, 1, 0, 0, 0, 0, 2'b01, 4'b0100, 2'b00, "XORI");
-        test_instruction(7'b0010011, 3'b110, 7'b0000000, 1, 0, 0, 0, 0, 2'b01, 4'b0110, 2'b00, "ORI");
-        test_instruction(7'b0010011, 3'b111, 7'b0000000, 1, 0, 0, 0, 0, 2'b01, 4'b0111, 2'b00, "ANDI");
+        test_instruction(7'b0010011, 3'b000, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b01, 4'b0000, 2'b00, "ADDI");
+        test_instruction(7'b0010011, 3'b010, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b01, 4'b0010, 2'b00, "SLTI");
+        test_instruction(7'b0010011, 3'b011, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b01, 4'b0011, 2'b00, "SLTIU");
+        test_instruction(7'b0010011, 3'b100, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b01, 4'b0100, 2'b00, "XORI");
+        test_instruction(7'b0010011, 3'b110, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b01, 4'b0110, 2'b00, "ORI");
+        test_instruction(7'b0010011, 3'b111, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b01, 4'b0111, 2'b00, "ANDI");
         
         // Load instructions
-        test_instruction(7'b0000011, 3'b000, 7'b0000000, 1, 1, 0, 0, 0, 2'b01, 4'b0000, 2'b01, "LB");
-        test_instruction(7'b0000011, 3'b001, 7'b0000000, 1, 1, 0, 0, 0, 2'b01, 4'b0000, 2'b01, "LH");
-        test_instruction(7'b0000011, 3'b010, 7'b0000000, 1, 1, 0, 0, 0, 2'b01, 4'b0000, 2'b01, "LW");
-        test_instruction(7'b0000011, 3'b100, 7'b0000000, 1, 1, 0, 0, 0, 2'b01, 4'b0000, 2'b01, "LBU");
-        test_instruction(7'b0000011, 3'b101, 7'b0000000, 1, 1, 0, 0, 0, 2'b01, 4'b0000, 2'b01, "LHU");
+        test_instruction(7'b0000011, 3'b000, 7'b0000000, 1, 1, 0, 0, 0, 1'b0, 2'b01, 4'b0000, 2'b01, "LB");
+        test_instruction(7'b0000011, 3'b001, 7'b0000000, 1, 1, 0, 0, 0, 1'b0, 2'b01, 4'b0000, 2'b01, "LH");
+        test_instruction(7'b0000011, 3'b010, 7'b0000000, 1, 1, 0, 0, 0, 1'b0, 2'b01, 4'b0000, 2'b01, "LW");
+        test_instruction(7'b0000011, 3'b100, 7'b0000000, 1, 1, 0, 0, 0, 1'b0, 2'b01, 4'b0000, 2'b01, "LBU");
+        test_instruction(7'b0000011, 3'b101, 7'b0000000, 1, 1, 0, 0, 0, 1'b0, 2'b01, 4'b0000, 2'b01, "LHU");
         
         // Store instructions
-        test_instruction(7'b0100011, 3'b000, 7'b0000000, 0, 0, 1, 0, 0, 2'b01, 4'b0000, 2'b00, "SB");
-        test_instruction(7'b0100011, 3'b001, 7'b0000000, 0, 0, 1, 0, 0, 2'b01, 4'b0000, 2'b00, "SH");
-        test_instruction(7'b0100011, 3'b010, 7'b0000000, 0, 0, 1, 0, 0, 2'b01, 4'b0000, 2'b00, "SW");
+        test_instruction(7'b0100011, 3'b000, 7'b0000000, 0, 0, 1, 0, 0, 1'b0, 2'b01, 4'b0000, 2'b00, "SB");
+        test_instruction(7'b0100011, 3'b001, 7'b0000000, 0, 0, 1, 0, 0, 1'b0, 2'b01, 4'b0000, 2'b00, "SH");
+        test_instruction(7'b0100011, 3'b010, 7'b0000000, 0, 0, 1, 0, 0, 1'b0, 2'b01, 4'b0000, 2'b00, "SW");
         
         // Branch instructions
-        test_instruction(7'b1100011, 3'b000, 7'b0000000, 0, 0, 0, 1, 0, 2'b00, 4'b1000, 2'b00, "BEQ");
-        test_instruction(7'b1100011, 3'b001, 7'b0000000, 0, 0, 0, 1, 0, 2'b00, 4'b1000, 2'b00, "BNE");
-        test_instruction(7'b1100011, 3'b100, 7'b0000000, 0, 0, 0, 1, 0, 2'b00, 4'b0010, 2'b00, "BLT");
-        test_instruction(7'b1100011, 3'b101, 7'b0000000, 0, 0, 0, 1, 0, 2'b00, 4'b0010, 2'b00, "BGE");
-        test_instruction(7'b1100011, 3'b110, 7'b0000000, 0, 0, 0, 1, 0, 2'b00, 4'b0011, 2'b00, "BLTU");
-        test_instruction(7'b1100011, 3'b111, 7'b0000000, 0, 0, 0, 1, 0, 2'b00, 4'b0011, 2'b00, "BGEU");
+        test_instruction(7'b1100011, 3'b000, 7'b0000000, 0, 0, 0, 1, 0, 1'b0, 2'b00, 4'b1000, 2'b00, "BEQ");
+        test_instruction(7'b1100011, 3'b001, 7'b0000000, 0, 0, 0, 1, 0, 1'b0, 2'b00, 4'b1000, 2'b00, "BNE");
+        test_instruction(7'b1100011, 3'b100, 7'b0000000, 0, 0, 0, 1, 0, 1'b0, 2'b00, 4'b0010, 2'b00, "BLT");
+        test_instruction(7'b1100011, 3'b101, 7'b0000000, 0, 0, 0, 1, 0, 1'b0, 2'b00, 4'b0010, 2'b00, "BGE");
+        test_instruction(7'b1100011, 3'b110, 7'b0000000, 0, 0, 0, 1, 0, 1'b0, 2'b00, 4'b0011, 2'b00, "BLTU");
+        test_instruction(7'b1100011, 3'b111, 7'b0000000, 0, 0, 0, 1, 0, 1'b0, 2'b00, 4'b0011, 2'b00, "BGEU");
         
         // Jump instructions
-        test_instruction(7'b1101111, 3'b000, 7'b0000000, 1, 0, 0, 0, 1, 2'b00, 4'b0000, 2'b10, "JAL");
-        test_instruction(7'b1100111, 3'b000, 7'b0000000, 1, 0, 0, 0, 1, 2'b01, 4'b0000, 2'b10, "JALR");
+        test_instruction(7'b1101111, 3'b000, 7'b0000000, 1, 0, 0, 0, 1, 1'b0, 2'b00, 4'b0000, 2'b10, "JAL");
+        test_instruction(7'b1100111, 3'b000, 7'b0000000, 1, 0, 0, 0, 1, 1'b0, 2'b01, 4'b0000, 2'b10, "JALR");
         
         // Upper immediate instructions
-        test_instruction(7'b0110111, 3'b000, 7'b0000000, 1, 0, 0, 0, 0, 2'b00, 4'b0000, 2'b11, "LUI");
-        test_instruction(7'b0010111, 3'b000, 7'b0000000, 1, 0, 0, 0, 0, 2'b10, 4'b0000, 2'b00, "AUIPC");
+        test_instruction(7'b0110111, 3'b000, 7'b0000000, 1, 0, 0, 0, 0, 1'b0, 2'b00, 4'b0000, 2'b11, "LUI");
+        test_instruction(7'b0010111, 3'b000, 7'b0000000, 1, 0, 0, 0, 0, 1'b1, 2'b01, 4'b0000, 2'b00, "AUIPC");
         
         $display("========================================");
         $display("Control Unit Test Results: %0d/%0d tests passed", pass_count, test_count);

@@ -8,10 +8,14 @@
 *.ltx
 *.tcl~
 
+# Build output directory
+build/
+
 # Vivado project directories
 projects/
 test_project/
 .Xil/
+xsim.dir/
 *.cache/
 *.hw/
 *.ip_user_files/
@@ -19,12 +23,7 @@ test_project/
 *.sim/
 *.srcs/generated_sources/
 *.gen/
-
-# Synthesis and implementation reports (keep only key reports)
-reports/*.rpt
-!reports/utilization_synth.rpt
-!reports/timing_synth.rpt
-!reports/synthesis_summary.rpt
+*.pb
 
 # Bitstream files
 *.bit

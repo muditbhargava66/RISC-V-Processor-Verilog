@@ -25,8 +25,14 @@ module lui_test;
         .alu_result_debug(alu_result_debug),
         .reg_debug_data1(reg_debug_data1),
         .reg_debug_data2(reg_debug_data2),
+        .mem_debug_data(),
+        .reg_debug_addr1(),
+        .reg_debug_addr2(),
         .immediate_debug(immediate_debug),
-        .reg_write_debug(reg_write_debug)
+        .reg_write_debug(reg_write_debug),
+        .mem_read_debug(),
+        .mem_write_debug(),
+        .branch_taken_debug()
     );
     
     // Clock generation

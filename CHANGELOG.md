@@ -5,7 +5,22 @@ All notable changes to the RISC-V Processor project will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - 2026-05-21
+## [1.1.0] - 2026-07-20
+
+### Integration Refinements
+- **Memory Image Management**: Relocated `instruction_memory.hex` to the repository root as the canonical source image for all build, simulation, and synthesis flows.
+- **Testbench Accuracy & Fixes**:
+  - `Control_unit_tb.v`: Connected new `alu_src1` port and updated `AUIPC` test vector expectation (`alu_src1 = 1'b1`, `alu_src = 2'b01`).
+  - `memory_tb.v`: Added `reset` port connection and 2-cycle reset sequence to prevent uninitialized memory state and clock-edge write race conditions.
+  - `riscv_processor_tb.v`: Explicitly connected all 13 debug output ports to eliminate unconnected port warnings.
+- **Lint & Tooling Consolidation**:
+  - `quick_lint_check.tcl`: Updated to project-root relative pathing, added memory image staging, removed stale reference to deleted `riscv_processor.xdc`, and directed outputs to `build/lint_check`.
+  - `.gitignore`: Added `build/` directory and updated ignored patterns.
+- **Realistic Verification & Benchmark Reporting**:
+  - `compliance_tests.v`: Replaced misleading "100% RV32I compliant" claim with accurate smoke-test reporting and skip tracking for unobserved opcodes.
+  - `performance_benchmark.v`: Added NOP-streak program-end detection to measure IPC only over the actual instruction stream, removing artificial IPC inflation after program completion.
+- **JTAG Debug Wrapper Integrity**:
+  - `riscv_processor_jtag_debug.v`: Implemented illegal opcode detection for `error_flag` and added detailed documentation clarifying vendor-neutral `mark_debug` tagging versus hardware IP instantiation.
 
 ### Added
 - **Enhanced Debug Interface**

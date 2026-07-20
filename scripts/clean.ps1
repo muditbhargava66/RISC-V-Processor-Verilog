@@ -59,6 +59,7 @@ if ($LogsOnly) {
 Write-Host "Cleaning generated files..." -ForegroundColor Yellow
 Remove-SafelyIfExists ".Xil" "Xilinx temporary directory"
 Remove-SafelyIfExists "xsim.dir" "XSim directory"
+Remove-SafelyIfExists "build" "Build output directory"
 
 # Clean simulation files
 Remove-FilePattern "*.wdb" "Waveform database files"

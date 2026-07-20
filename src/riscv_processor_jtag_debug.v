@@ -57,18 +57,35 @@ module riscv_processor_jtag_debug (
         .branch_taken_debug(branch_taken_debug)
     );
 
-    // External status outputs - minimal I/O usage
+// External status outputs - minimal I/O usage
     assign status_leds = pc_debug[7:0];      // Show PC lower 8 bits on LEDs
     assign processor_active = |instruction_debug; // Active when instruction is non-zero
-    assign error_flag = 1'b0;                 // Error flag placeholder
 
     // Helper wires to identify jump and branch operations from the instruction opcode
     wire jump_op = (instruction_debug[6:0] == 7'b1101111) || (instruction_debug[6:0] == 7'b1100111);
     wire branch_op = (instruction_debug[6:0] == 7'b1100011);
 
-    // VIO (Virtual Input/Output) for runtime control via JTAG
-    (* mark_debug = "true" *) reg [31:0] vio_control_reg = 32'h0;
-    (* mark_debug = "true" *) wire [31:0] vio_status_reg = {
+    // Detect illegal/unrecognized opcodes when instruction is non-zero
+    wire valid_opcode = (instruction_debug[6:0] == 7'b0110011) || // R-type
+                         (instruction_debug[6:0] == 7'b0010011) || // I-type ALU
+                         (instruction_debug[6:0] == 7'b0000011) || // Load
+                         (instruction_debug[6:0] == 7'b0100011) || // Store
+                         (instruction_debug[6:0] == 7'b1100011) || // Branch
+                         (instruction_debug[6:0] == 7'b1101111) || // JAL
+                         (instruction_debug[6:0] == 7'b1100111) || // JALR
+                         (instruction_debug[6:0] == 7'b0110111) || // LUI
+                         (instruction_debug[6:0] == 7'b0010111) || // AUIPC
+                         (instruction_debug == 32'h00000000);     // Reset/uninitialized
+
+    assign error_flag = processor_active && !valid_opcode;
+
+    // Debug signal aggregation for Vivado debug flow
+    // Note: mark_debug attributes allow Vivado's "Set Up Debug" wizard or Tcl commands
+    // to attach an Integrated Logic Analyzer (ILA) during synthesis/implementation.
+    // Explicit ILA/VIO IP blocks are not instantiated directly in Verilog source to keep
+    // the core vendor-neutral and avoid IP catalog dependencies.
+    (* mark_debug = "true" *) wire [31:0] debug_control_reg = 32'h0;
+    (* mark_debug = "true" *) wire [31:0] debug_status_reg = {
         16'h0,
         instruction_debug[6:0],  // opcode
         branch_taken_debug,
