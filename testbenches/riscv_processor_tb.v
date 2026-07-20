@@ -6,6 +6,7 @@ module riscv_processor_tb;
     // Clock and reset
     reg clk;
     reg reset;
+    integer errors;
 
     // Instantiate the DUT
     riscv_processor dut (
@@ -41,7 +42,7 @@ module riscv_processor_tb;
         $display("----------------------------------------");
 
         // 3. Verification phase
-        integer errors = 0;
+        errors = 0;
         
         // Check final register values
         // To access internal signals, we use hierarchical names.
@@ -57,10 +58,10 @@ module riscv_processor_tb;
 
         // 4. Report final status
         if (errors == 0) begin
-            $display("✅ ✅ ✅ ALL TESTS PASSED! ✅ ✅ ✅");
+            $display("ALL TESTS PASSED!");
             $display("The RISC-V processor is behaving as expected.");
         end else begin
-            $display("❌ ❌ ❌ %0d TESTS FAILED! ❌ ❌ ❌", errors);
+            $display("%0d TESTS FAILED!", errors);
             $display("The RISC-V processor has bugs to fix.");
         end
 
@@ -78,7 +79,7 @@ module riscv_processor_tb;
         reg [31:0] actual_value;
     begin
         // Access the register file memory directly
-        actual_value = dut.regfile_inst.memory[reg_num];
+        actual_value = (reg_num == 5'b0) ? 32'h0 : dut.regfile_inst.registers[reg_num];
         
         if (actual_value === expected_value) begin
             $display("PASS: %s (x%0d = 0x%08h)", test_name, reg_num, actual_value);

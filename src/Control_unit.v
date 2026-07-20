@@ -10,6 +10,7 @@ module control_unit (
     output reg mem_write,
     output reg branch,
     output reg jump,
+    output reg alu_src1,
     output reg [1:0] alu_src,
     output reg [3:0] alu_op,
     output reg [1:0] reg_write_src
@@ -51,6 +52,7 @@ module control_unit (
         mem_write = 1'b0;
         branch = 1'b0;
         jump = 1'b0;
+        alu_src1 = 1'b0;
         alu_src = 2'b00;
         alu_op = ALU_ADD;
         reg_write_src = WRITE_SRC_ALU;
@@ -144,9 +146,10 @@ module control_unit (
 
             OPCODE_AUIPC: begin
                 reg_write = 1'b1;
-                alu_src = 2'b10; // PC
+                alu_src1 = 1'b1; // PC as operand A
+                alu_src = 2'b01; // Immediate as operand B
                 alu_op = ALU_ADD;
-                reg_write_src = WRITE_SRC_ALU; // ALU result
+                reg_write_src = WRITE_SRC_ALU; // ALU result (PC + immediate)
             end
 
             default: begin

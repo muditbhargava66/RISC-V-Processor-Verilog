@@ -1,195 +1,100 @@
-# RISC-V Processor v1.1.0 Makefile
-# Automation for build, test, clean, and deployment tasks
+# RISC-V Processor build and verification entry points
+#
+# Override VIVADO when it is installed elsewhere, for example:
+#   make VIVADO="C:/Xilinx/Vivado/2023.2/bin/vivado.bat" test-system
 
-# Project configuration
-PROJECT_NAME = riscv_processor_v1
-PROJECT_DIR = ./projects/vivado/$(PROJECT_NAME)
-VIVADO = vivado
-VIVADO_BATCH = $(VIVADO) -mode batch
+VIVADO ?= C:/Xilinx/Vivado/2023.2/bin/vivado.bat
+VIVADO_BATCH = "$(VIVADO)" -mode batch
 
-# Default target
-.PHONY: all
-all: help
+.DEFAULT_GOAL := help
 
-# Help target
-.PHONY: help
+.PHONY: help lint \
+	test-system test-alu test-control test-memory test-regfile test-compliance \
+	test-benchmark test-formal test-all \
+	create-project create-project-minimal create-project-jtag \
+	synthesize implement-minimal implement-jtag build-all status clean-build
+
 help:
-	@echo "========================================="
-	@echo "RISC-V Processor v1.1.0 Build System"
-	@echo "========================================="
-	@echo "Available targets:"
-	@echo ""
-	@echo "Build targets:"
-	@echo "  create-project  - Create Vivado project"
-	@echo "  synthesize      - Run synthesis"
-	@echo "  implement       - Run implementation"
-	@echo "  bitstream       - Generate bitstream"
-	@echo "  build-all       - Complete build flow"
-	@echo ""
-	@echo "Test targets:"
-	@echo "  test-system     - Run system testbench"
-	@echo "  test-alu        - Run ALU testbench"
-	@echo "  test-control    - Run control unit testbench"
-	@echo "  test-memory     - Run memory testbench"
-	@echo "  test-regfile    - Run register file testbench"
-	@echo "  test-all        - Run all testbenches"
-	@echo ""
-	@echo "Analysis targets:"
-	@echo "  reports         - Generate all reports"
-	@echo "  timing          - Generate timing reports"
-	@echo "  utilization     - Generate utilization reports"
-	@echo ""
-	@echo "Maintenance targets:"
-	@echo "  clean           - Clean generated files"
-	@echo "  clean-all       - Deep clean (including projects)"
-	@echo "  clean-logs      - Clean log and journal files"
-	@echo ""
-	@echo "Git targets:"
-	@echo "  git-status      - Show git status"
-	@echo "  git-add         - Add all changes"
-	@echo "  git-commit      - Commit with standard message"
-	@echo "========================================="
+	@echo RISC-V Processor build and verification flow
+	@echo.
+	@echo Verification:
+	@echo   lint                  - Synthesize the core as an elaboration check
+	@echo   test-system           - Run the self-checking processor program
+	@echo   test-alu              - Run ALU unit tests
+	@echo   test-control          - Run control-unit tests
+	@echo   test-memory           - Run instruction/data-memory tests
+	@echo   test-regfile          - Run register-file tests
+	@echo   test-compliance       - Run targeted ISA smoke checks
+	@echo   test-benchmark        - Run the bounded smoke-program metric report
+	@echo   test-formal           - Run SystemVerilog assertion simulation (tool-dependent)
+	@echo   test-all              - Run deterministic regression tests (excludes assertions)
+	@echo.
+	@echo FPGA flow:
+	@echo   create-project        - Create/reuse the core synthesis project
+	@echo   create-project-minimal- Create/reuse the Basys3 minimal wrapper project
+	@echo   create-project-jtag   - Create/reuse the debug-signal wrapper project
+	@echo   synthesize            - Synthesize the unconstrained core and write reports
+	@echo   implement-minimal     - Implement and write a minimal-wrapper bitstream
+	@echo   implement-jtag        - Implement and write a debug-wrapper bitstream
+	@echo   build-all             - Implement both FPGA wrappers
+	@echo.
+	@echo Maintenance:
+	@echo   status                - Show the working-tree state
+	@echo   clean-build           - Remove only ignored build/ outputs
+	@echo.
+	@echo All generated projects, simulations, reports, and bitstreams live under build/.
 
-# Build targets
-.PHONY: create-project
-create-project:
-	@echo "Creating Vivado project..."
-	$(VIVADO_BATCH) -source scripts/build_vivado_v1.tcl
+lint:
+	$(VIVADO_BATCH) -source scripts/quick_lint_check.tcl
 
-.PHONY: synthesize
-synthesize:
-	@echo "Running synthesis..."
-	$(VIVADO_BATCH) -source scripts/run_synthesis.tcl
-
-.PHONY: implement
-implement: synthesize
-	@echo "Running implementation..."
-	$(VIVADO_BATCH) -source scripts/run_implementation.tcl
-
-.PHONY: bitstream
-bitstream: implement
-	@echo "Generating bitstream..."
-	$(VIVADO_BATCH) -source scripts/generate_bitstream.tcl
-
-.PHONY: build-all
-build-all: create-project synthesize reports
-	@echo "Complete build finished successfully!"
-
-# Test targets
-.PHONY: test-system
 test-system:
-	@echo "Running system testbench..."
-	$(VIVADO_BATCH) -source scripts/run_system_test.tcl
+	$(VIVADO_BATCH) -source scripts/run_simulation.tcl -tclargs system
 
-.PHONY: test-alu
 test-alu:
-	@echo "Running ALU testbench..."
-	$(VIVADO_BATCH) -source testbenches/run_alu_test.tcl
+	$(VIVADO_BATCH) -source scripts/run_simulation.tcl -tclargs alu
 
-.PHONY: test-control
 test-control:
-	@echo "Running control unit testbench..."
-	$(VIVADO_BATCH) -source testbenches/run_control_test.tcl
+	$(VIVADO_BATCH) -source scripts/run_simulation.tcl -tclargs control
 
-.PHONY: test-memory
 test-memory:
-	@echo "Running memory testbench..."
-	$(VIVADO_BATCH) -source testbenches/run_memory_test.tcl
+	$(VIVADO_BATCH) -source scripts/run_simulation.tcl -tclargs memory
 
-.PHONY: test-regfile
 test-regfile:
-	@echo "Running register file testbench..."
-	$(VIVADO_BATCH) -source testbenches/run_regfile_test.tcl
+	$(VIVADO_BATCH) -source scripts/run_simulation.tcl -tclargs regfile
 
-.PHONY: test-all
-test-all: test-system test-alu test-control test-memory test-regfile
-	@echo "All tests completed!"
+test-compliance:
+	$(VIVADO_BATCH) -source scripts/run_simulation.tcl -tclargs compliance
 
-# Analysis targets
-.PHONY: reports
-reports:
-	@echo "Generating comprehensive reports..."
-	$(VIVADO_BATCH) -source scripts/generate_reports.tcl
+test-benchmark:
+	$(VIVADO_BATCH) -source scripts/run_simulation.tcl -tclargs benchmark
 
-.PHONY: timing
-timing:
-	@echo "Generating timing reports..."
-	$(VIVADO_BATCH) -source scripts/timing_analysis.tcl
+test-formal:
+	$(VIVADO_BATCH) -source scripts/run_simulation.tcl -tclargs formal
 
-.PHONY: utilization
-utilization:
-	@echo "Generating utilization reports..."
-	$(VIVADO_BATCH) -source scripts/utilization_analysis.tcl
+test-all: test-system test-alu test-control test-memory test-regfile test-compliance test-benchmark
 
-# Clean targets
-.PHONY: clean-logs
-clean-logs:
-	@echo "Cleaning log and journal files..."
-	@if exist "*.log" del /q *.log >nul 2>&1
-	@if exist "*.jou" del /q *.jou >nul 2>&1
-	@if exist "vivado*.log" del /q vivado*.log >nul 2>&1
-	@if exist "vivado*.jou" del /q vivado*.jou >nul 2>&1
-	@for /r %%i in (*.backup.log) do @if exist "%%i" del /q "%%i" >nul 2>&1
-	@for /r %%i in (*.backup.jou) do @if exist "%%i" del /q "%%i" >nul 2>&1
-	@echo "Log files cleaned."
+create-project:
+	$(VIVADO_BATCH) -source scripts/build_vivado.tcl -tclargs core
 
-.PHONY: clean
-clean: clean-logs
-	@echo "Cleaning generated files..."
-	@if exist ".Xil" rmdir /s /q .Xil >nul 2>&1
-	@if exist "xsim.dir" rmdir /s /q xsim.dir >nul 2>&1
-	@if exist "*.wdb" del /q *.wdb >nul 2>&1
-	@if exist "*.wcfg" del /q *.wcfg >nul 2>&1
-	@if exist "*.vcd" del /q *.vcd >nul 2>&1
-	@if exist "*.pb" del /q *.pb >nul 2>&1
-	@if exist "*.dcp" del /q *.dcp >nul 2>&1
-	@if exist "*.bit" del /q *.bit >nul 2>&1
-	@if exist "*.ltx" del /q *.ltx >nul 2>&1
-	@if exist "*.mmi" del /q *.mmi >nul 2>&1
-	@echo "Generated files cleaned."
+create-project-minimal:
+	$(VIVADO_BATCH) -source scripts/build_vivado.tcl -tclargs minimal
 
-.PHONY: clean-all
-clean-all: clean
-	@echo "Deep cleaning (including projects)..."
-	@if exist "projects" rmdir /s /q projects >nul 2>&1
-	@if exist "test_project" rmdir /s /q test_project >nul 2>&1
-	@echo "Deep clean completed."
+create-project-jtag:
+	$(VIVADO_BATCH) -source scripts/build_vivado.tcl -tclargs jtag
 
-# Git targets
-.PHONY: git-status
-git-status:
-	@git status
+synthesize:
+	$(VIVADO_BATCH) -source scripts/run_synthesis_impl.tcl -tclargs core
 
-.PHONY: git-add
-git-add: clean-logs
-	@echo "Adding all changes to git..."
-	@git add .
+implement-minimal:
+	$(VIVADO_BATCH) -source scripts/run_synthesis_impl.tcl -tclargs minimal
 
-.PHONY: git-commit
-git-commit: git-add
-	@echo "Committing changes..."
-	@git commit -m "feat: Updates for v1.1.0 with bug fixes and improved verification"
+implement-jtag:
+	$(VIVADO_BATCH) -source scripts/run_synthesis_impl.tcl -tclargs jtag
 
-# Utility targets
-.PHONY: check-vivado
-check-vivado:
-	@which $(VIVADO) > /dev/null || (echo "Error: Vivado not found in PATH" && exit 1)
-	@echo "Vivado found: $$($(VIVADO) -version | head -1)"
+build-all: implement-minimal implement-jtag
 
-.PHONY: project-info
-project-info:
-	@echo "Project: $(PROJECT_NAME)"
-	@echo "Location: $(PROJECT_DIR)"
-	@echo "Source files: $$(find src/ -name "*.v" | wc -l)"
-	@echo "Testbenches: $$(find testbenches/ -name "*_tb.v" | wc -l)"
-	@echo "Scripts: $$(find scripts/ -name "*.tcl" | wc -l)"
+status:
+	@git status --short --branch
 
-# File existence checks
-$(PROJECT_DIR):
-	@echo "Project directory does not exist. Run 'make create-project' first."
-	@exit 1
-
-# Dependencies
-synthesize: | $(PROJECT_DIR)
-reports: | $(PROJECT_DIR)
-test-system: | $(PROJECT_DIR)
+clean-build:
+	@powershell -NoProfile -ExecutionPolicy Bypass -File scripts/clean.ps1

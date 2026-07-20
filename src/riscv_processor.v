@@ -7,7 +7,17 @@ module riscv_processor (
     input wire reset,
     output wire [31:0] pc_debug,
     output wire [31:0] instruction_debug,
-    output wire [31:0] alu_result_debug
+    output wire [31:0] alu_result_debug,
+    output wire [31:0] reg_debug_data1,      // Register file read port 1 data
+    output wire [31:0] reg_debug_data2,      // Register file read port 2 data
+    output wire [31:0] mem_debug_data,       // Memory read data
+    output wire [4:0] reg_debug_addr1,       // Register file read address 1
+    output wire [4:0] reg_debug_addr2,       // Register file read address 2
+    output wire [31:0] immediate_debug,      // Generated immediate value
+    output wire reg_write_debug,             // Register write enable
+    output wire mem_read_debug,              // Memory read enable
+    output wire mem_write_debug,             // Memory write enable
+    output wire branch_taken_debug           // Branch taken status
 );
 
     // Internal signals
@@ -23,6 +33,7 @@ module riscv_processor (
     
     // Control signals
     wire reg_write, mem_read, mem_write, branch, jump;
+    wire alu_src1;
     wire [1:0] alu_src, reg_write_src;
     wire [3:0] alu_op;
     
@@ -38,6 +49,16 @@ module riscv_processor (
     assign pc_debug = pc_current;
     assign instruction_debug = instruction;
     assign alu_result_debug = alu_result;
+    assign reg_debug_data1 = read_data1;
+    assign reg_debug_data2 = read_data2;
+    assign mem_debug_data = mem_read_data;
+    assign reg_debug_addr1 = rs1;
+    assign reg_debug_addr2 = rs2;
+    assign immediate_debug = immediate;
+    assign reg_write_debug = reg_write;
+    assign mem_read_debug = mem_read;
+    assign mem_write_debug = mem_write;
+    assign branch_taken_debug = branch_taken;
     
     // Program Counter
     program_counter pc_inst (
@@ -59,7 +80,9 @@ module riscv_processor (
     wire bgeu_cond = (funct3 == 3'b111) & ~alu_result[0];
     assign branch_taken = branch & (beq_cond | bne_cond | blt_cond | bge_cond | bltu_cond | bgeu_cond);
 
-    wire [31:0] jump_target = (opcode == 7'b1101111) ? (pc_current + immediate) : alu_result; // JAL or JALR
+    // JAL: target = PC + immediate
+    // JALR: target = (rs1 + imm) & ~1 (clear LSB per RISC-V spec)
+    wire [31:0] jump_target = (opcode == 7'b1101111) ? (pc_current + immediate) : {alu_result[31:1], 1'b0};
     assign pc_next = jump ? jump_target :
                      branch_taken ? (pc_current + immediate) :
                      pc_plus_4;
@@ -99,13 +122,15 @@ module riscv_processor (
         .mem_write(mem_write),
         .branch(branch),
         .jump(jump),
+        .alu_src1(alu_src1),
         .alu_src(alu_src),
         .alu_op(alu_op),
         .reg_write_src(reg_write_src)
     );
     
     // ALU operand selection
-    assign alu_operand1 = read_data1;
+    // alu_src1: 0 = register, 1 = PC (for AUIPC)
+    assign alu_operand1 = alu_src1 ? pc_current : read_data1;
     assign alu_operand2 = (alu_src == 2'b00) ? read_data2 :     // Register
                          (alu_src == 2'b01) ? immediate :       // Immediate
                          (alu_src == 2'b10) ? pc_current :      // PC
