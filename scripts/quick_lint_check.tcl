@@ -2,48 +2,31 @@
 # Checks for syntax and elaboration errors in the core RTL
 # Does NOT require board-level constraints — this is a pure RTL check.
 
+source [file join [file dirname [info script]] riscv_build_common.tcl]
+
+riscv_build::init_repo_root
+
 puts "========================================="
-puts "RISC-V Processor v1.1.0 - Quick Lint Check"
+puts "RISC-V Processor - Quick Lint Check      "
 puts "========================================="
 
-# Close any existing project
 catch {close_project -quiet}
 
-set repo_root [file normalize [file join [file dirname [info script]] ..]]
 set project_name "riscv_lint_check"
-set project_dir [file join $repo_root build lint_check]
+set project_dir [file join $riscv_build::repo_root build lint_check]
 
 # Clean up previous lint run
 file delete -force $project_dir
 
 # Create project
-create_project $project_name $project_dir -part xc7a35tcpg236-1 -force
+create_project $project_name $project_dir -part $riscv_build::part_name -force
 
 # Add ONLY the core source files (not minimal or jtag_debug variants)
 puts "Adding core source files..."
-set source_files [list \
-    [file join $repo_root src riscv_processor.v] \
-    [file join $repo_root src program_counter.v] \
-    [file join $repo_root src instruction_memory.v] \
-    [file join $repo_root src register_file.v] \
-    [file join $repo_root src Control_unit.v] \
-    [file join $repo_root src immediate_generator.v] \
-    [file join $repo_root src alu.v] \
-    [file join $repo_root src data_memory.v] \
-]
+set source_files [riscv_build::get_core_files]
+set memory_image [riscv_build::get_memory_image]
 
-add_files -norecurse $source_files
-
-# Add instruction memory image so $readmemh resolves without warnings
-set memory_image [file join $repo_root instruction_memory.hex]
-if {[file exists $memory_image]} {
-    add_files -norecurse $memory_image
-    set_property file_type {Memory File} [get_files $memory_image]
-    puts "Added instruction memory image: $memory_image"
-} else {
-    puts "WARNING: instruction_memory.hex not found at $memory_image"
-    puts "         $readmemh will issue a critical warning during synthesis."
-}
+riscv_build::add_source_files $source_files $memory_image
 
 # No constraint file — lint checking the core RTL does not need board-level pins.
 
@@ -56,7 +39,6 @@ update_compile_order -fileset sources_1
 puts ""
 puts "--- Running Syntax Check ---"
 # Check syntax
-set syntax_errors 0
 foreach f [get_files -of_objects [get_filesets sources_1]] {
     puts "Checking: [file tail $f]"
 }

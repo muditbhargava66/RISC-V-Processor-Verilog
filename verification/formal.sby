@@ -1,0 +1,35 @@
+[options]
+mode prove
+depth 50
+wait on
+
+[engines]
+smtbmc
+abc pdr
+aigbmc
+
+[script]
+read_verilog -I src src/riscv_pkg.sv
+read_verilog -I src src/alu.sv
+read_verilog -I src src/immediate_generator.sv
+read_verilog -I src src/program_counter.sv
+read_verilog -I src src/register_file.sv
+read_verilog -I src src/instruction_memory.sv
+read_verilog -I src src/data_memory.sv
+read_verilog -I src src/control_unit.sv
+read_verilog -I src src/riscv_processor.sv
+read_verilog -I verification verification/riscv_processor_sva.sv
+
+prep -top riscv_processor_sva
+
+[files]
+src/riscv_pkg.sv
+src/alu.sv
+src/immediate_generator.sv
+src/program_counter.sv
+src/register_file.sv
+src/instruction_memory.sv
+src/data_memory.sv
+src/control_unit.sv
+src/riscv_processor.sv
+verification/riscv_processor_sva.sv

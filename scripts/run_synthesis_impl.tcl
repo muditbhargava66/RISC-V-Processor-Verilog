@@ -1,6 +1,10 @@
 # Run synthesis, and optionally implementation, in the generated build/ tree.
 # Usage: vivado -mode batch -source scripts/run_synthesis_impl.tcl -tclargs <core|minimal|jtag>
 
+source [file join [file dirname [info script]] riscv_build_common.tcl>
+
+riscv_build::init_repo_root
+
 catch {close_project -quiet}
 
 set target "core"
@@ -8,22 +12,16 @@ if {$argc > 0} {
     set target [lindex $argv 0]
 }
 
-set repo_root [file normalize [file join [file dirname [info script]] ..]]
-
-switch -- $target {
-    core { set project_name "riscv_processor_core" }
-    minimal { set project_name "riscv_processor_minimal" }
-    jtag { set project_name "riscv_processor_jtag_debug" }
-    default {
-        puts "ERROR: Unknown target '$target'. Use core, minimal, or jtag."
-        exit 1
-    }
+if {![riscv_build::validate_target $target]} {
+    exit 1
 }
 
-set project_path [file join $repo_root build vivado $project_name "$project_name.xpr"]
+set project_name [riscv_build::get_target_config $target project_name]
+set project_path [file join $riscv_build::repo_root build vivado $project_name "$project_name.xpr"]
+
 if {![file exists $project_path]} {
     puts "Generated project does not exist; creating it first."
-    source [file join $repo_root scripts build_vivado.tcl]
+    source [file join $riscv_build::repo_root scripts build_vivado.tcl]
 }
 
 if {![file exists $project_path]} {
@@ -31,28 +29,14 @@ if {![file exists $project_path]} {
     exit 1
 }
 
-file mkdir [file join $repo_root build reports]
-open_project $project_path
-update_compile_order -fileset sources_1
+file mkdir [file join $riscv_build::repo_root build reports]
 
-puts "========================================="
-puts "Running synthesis for $target"
-puts "========================================="
-reset_run synth_1
-launch_runs synth_1 -jobs 4
-wait_on_run synth_1
-
-set synth_status [get_property STATUS [get_runs synth_1]]
-puts "Synthesis status: $synth_status"
-if {![string match "*Complete*" $synth_status]} {
-    puts "ERROR: Synthesis failed. Review $project_path.runs/synth_1/runme.log"
-    close_project
+if {![riscv_build::run_synthesis $project_path]} {
     exit 1
 }
 
 open_run synth_1
-report_utilization -file [file join $repo_root build reports "utilization_${target}_synth.rpt"]
-report_timing_summary -file [file join $repo_root build reports "timing_${target}_synth.rpt"]
+riscv_build::generate_synth_reports $riscv_build::repo_root $target
 
 if {$target eq "core"} {
     close_project
@@ -60,27 +44,12 @@ if {$target eq "core"} {
     exit 0
 }
 
-puts "========================================="
-puts "Running implementation for $target"
-puts "========================================="
-reset_run impl_1
-launch_runs impl_1 -to_step write_bitstream -jobs 4
-wait_on_run impl_1
-
-set impl_status [get_property STATUS [get_runs impl_1]]
-puts "Implementation status: $impl_status"
-if {![string match "*Complete*" $impl_status]} {
-    puts "ERROR: Implementation or bitstream generation failed."
-    close_project
+if {![riscv_build::run_implementation $project_path $target]} {
     exit 1
 }
 
 open_run impl_1
-report_utilization -file [file join $repo_root build reports "utilization_${target}_impl.rpt"]
-report_timing_summary -file [file join $repo_root build reports "timing_${target}_impl.rpt"]
-report_power -file [file join $repo_root build reports "power_${target}_impl.rpt"]
-report_drc -file [file join $repo_root build reports "drc_${target}_impl.rpt"]
-report_methodology -file [file join $repo_root build reports "methodology_${target}_impl.rpt"]
+riscv_build::generate_impl_reports $riscv_build::repo_root $target
 close_project
 
 puts "Implementation and bitstream generation completed successfully."

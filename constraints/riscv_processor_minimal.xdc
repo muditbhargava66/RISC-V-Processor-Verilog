@@ -48,3 +48,7 @@ set_clock_uncertainty -hold 0.050 [get_clocks sys_clk_pin]
 
 # Set maximum delay for internal paths
 set_max_delay -from [get_clocks sys_clk_pin] -to [get_clocks sys_clk_pin] 19.500
+
+# I/O voltage configuration for bitstream generation
+set_property CFGBVS VCCO [current_design]
+set_property CONFIG_VOLTAGE 3.3 [current_design]
