@@ -135,6 +135,7 @@ module register_file_tb;
             $display("ALL TESTS PASSED!");
         end else begin
             $display("SOME TESTS FAILED!");
+            $fatal(1, "Register file testbench: %0d failures", test_count - pass_count);
         end
         $display("========================================");
 

@@ -131,17 +131,17 @@ module memory_tb;
         $display("--- Testing Instruction Memory ---");
         test_instruction_memory(32'h00000000, 32'hDEAD00B7, "First instruction (LUI x1, 0xDEAD0)");
         test_instruction_memory(32'h00000004, 32'h23408093, "Second instruction (ADDI x1, x1, 0x234)");
-        test_instruction_memory(32'h00000008, 32'h00102023, "Third instruction (SW x1, 0(x2))");
+        test_instruction_memory(32'h00000008, 32'h00102023, "Third instruction (SW x1, 0(x0))");
         test_instruction_memory(32'h0000000C, 32'h00002103, "Fourth instruction (LW x2, 0(x0))");
 
         // Test word-aligned addresses
-        test_instruction_memory(32'h00000010, 32'hFFF00193, "Fifth instruction (ADDI x3, x0, -16)");
+        test_instruction_memory(32'h00000010, 32'hFFF00193, "Fifth instruction (ADDI x3, x0, -1)");
         test_instruction_memory(32'h00000014, 32'h00100213, "Sixth instruction (ADDI x4, x0, 1)");
-        test_instruction_memory(32'h00000018, 32'h0041C263, "Branch instruction (BLT x3, x1, ...)");
-        test_instruction_memory(32'h0000001C, 32'h000002B3, "ADD x5, x0, x0");
-        test_instruction_memory(32'h00000020, 32'h004202B3, "ADD x5, x4, x0");
-        test_instruction_memory(32'h00000024, 32'h0041D263, "Branch instruction (BGE x3, x1, ...)");
-        test_instruction_memory(32'h00000028, 32'h00420333, "ADD x6, x4, x0");
+        test_instruction_memory(32'h00000018, 32'h0041C263, "Branch instruction (BLT x3, x4, +4)");
+        test_instruction_memory(32'h0000001C, 32'h000002B3, "ADD x5, x0, x0 (skipped by branch)");
+        test_instruction_memory(32'h00000020, 32'h004202B3, "ADD x5, x4, x4");
+        test_instruction_memory(32'h00000024, 32'h0041D263, "Branch instruction (BGE x3, x4, +4)");
+        test_instruction_memory(32'h00000028, 32'h00420333, "ADD x6, x4, x4");
         test_instruction_memory(32'h0000002C, 32'h00000013, "NOP");
 
         $display("");
@@ -184,6 +184,7 @@ module memory_tb;
             $display("ALL MEMORY TESTS PASSED!");
         end else begin
             $display("SOME MEMORY TESTS FAILED!");
+            $fatal(1, "Memory testbench: %0d failures", test_count - pass_count);
         end
         $display("========================================");
 

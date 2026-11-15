@@ -14,6 +14,7 @@ module program_counter #(
 )(
     input  logic        clk,
     input  logic        reset,
+    input  logic        hold,
     input  logic [XLEN-1:0] pc_next,
     output logic [XLEN-1:0] pc_current
 );
@@ -25,16 +26,19 @@ module program_counter #(
 always_ff @(posedge clk) begin
     if (reset)
         pc_current <= '0;
-    else
+    else if (!hold)
         pc_current <= pc_next;
 end
 ```
 
 ### Behavior
 
-- **Reset**: PC initializes to 0x00000000
-- **Update**: PC updates to `pc_next` on each clock cycle
-- **No enable signal**: PC updates every cycle (single-cycle architecture)
+- **Reset**: PC initializes to 0x00000000 (synchronous, highest priority)
+- **Update**: PC loads `pc_next` on each clock cycle when `hold=0`
+- **Hold (stall)**: when `hold=1` the PC freezes its current value. The core
+  asserts `hold = is_div && !div_done` to stall the fetch during a multi-cycle
+  RV32M divide/remainder, so the same instruction (and its register operands)
+  remain stable until the divider signals `done`. See [Divider](divider.md).
 
 ### PC Next Calculation (in core processor)
 

@@ -1,3 +1,4 @@
+`timescale 1ns / 1ps
 // Register File Module
 // 32 x XLEN-bit registers with x0 hardwired to zero
 // SystemVerilog implementation with synchronous reset
@@ -39,13 +40,17 @@ module register_file #(
     assign read_data1 = (read_reg1 == '0) ? '0 : registers[read_reg1];
     assign read_data2 = (read_reg2 == '0) ? '0 : registers[read_reg2];
 
-    // Synthesis-time assertions
+    // Optional simulation-only diagnostic (enable with +define+RISCV_DEBUG).
+    // Writing x0 is legal RISC-V (the write is simply ignored), so this is quiet
+    // by default to avoid log spam on programs that target x0.
     // synthesis translate_off
+`ifdef RISCV_DEBUG
     always_ff @(posedge clk) begin
         if (reg_write && write_reg == '0) begin
             $warning("REG_FILE: Attempt to write to x0 (ignored)");
         end
     end
+`endif
     // synthesis translate_on
 
 endmodule

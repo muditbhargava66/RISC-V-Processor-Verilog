@@ -21,7 +21,7 @@ module immediate_generator #(
 
 ```systemverilog
 always_comb begin
-    unique case (opcode)
+    case (opcode)
         OPCODE_I_TYPE, OPCODE_LOAD, OPCODE_JALR: begin
             // I-type: imm[11:0] = instruction[31:20]
             immediate = {{(XLEN-12){instruction[31]}}, instruction[31:20]};
@@ -39,8 +39,9 @@ always_comb begin
         end
 
         OPCODE_LUI, OPCODE_AUIPC: begin
-            // U-type: imm[31:12] = instruction[31:12], imm[11:0] = 0
-            immediate = {instruction[31:12], {(XLEN-32){1'b0}}, 12'b0};
+            // U-type: imm[31:12] = instruction[31:12], imm[11:0] = 0;
+            // the 32-bit result is sign-extended to XLEN (a no-op for RV32).
+            immediate = {{(XLEN-32){instruction[31]}}, instruction[31:12], 12'b0};
         end
 
         OPCODE_JAL: begin

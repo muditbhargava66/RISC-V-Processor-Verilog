@@ -1,7 +1,7 @@
 # Run synthesis, and optionally implementation, in the generated build/ tree.
 # Usage: vivado -mode batch -source scripts/run_synthesis_impl.tcl -tclargs <core|minimal|jtag>
 
-source [file join [file dirname [info script]] riscv_build_common.tcl>
+source [file join [file dirname [info script]] riscv_build_common.tcl]
 
 riscv_build::init_repo_root
 

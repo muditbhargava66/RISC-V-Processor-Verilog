@@ -21,7 +21,7 @@ cd RISC-V-Processor-Verilog
 make test-all
 ```
 
-This runs: `lint`, `test-system`, `test-alu`, `test-control`, `test-memory`, `test-regfile`, `test-compliance`, `test-benchmark`
+This runs: `test-system`, `test-alu`, `test-control`, `test-memory`, `test-regfile`, `test-immgen`, `test-pc`, `test-compliance`. Run `make lint` separately for the synthesis/elaboration check.
 
 ## 3. Build for FPGA (Basys3)
 
@@ -29,13 +29,13 @@ This runs: `lint`, `test-system`, `test-alu`, `test-control`, `test-memory`, `te
 ```powershell
 make implement-minimal
 ```
-Generates `build/vivado/riscv_processor_minimal/riscv_processor_minimal.bit`
+Generates `build/vivado/riscv_processor_minimal/riscv_processor_minimal.runs/impl_1/riscv_processor_minimal.bit`
 
 ### JTAG Debug Wrapper (Development)
 ```powershell
 make implement-jtag
 ```
-Generates `build/vivado/riscv_processor_jtag_debug/riscv_processor_jtag_debug.bit` with ILA/VIO
+Generates `build/vivado/riscv_processor_jtag_debug/riscv_processor_jtag_debug.runs/impl_1/riscv_processor_jtag_debug.bit` with ILA/VIO
 
 ## 4. Program the Board
 
@@ -56,12 +56,15 @@ sby -f verification/formal_cover.sby    # Coverage collection
 |------|------------------|
 | `make lint` | SYNTHESIS: PASSED (0 errors, 0 critical warnings) |
 | `make test-system` | 6/6 register checks PASS |
-| `make test-alu` | 24/24 ALU operations PASS |
-| `make test-control` | 37/37 decode tests PASS |
+| `make test-alu` | 21/21 ALU vectors PASS |
+| `make test-control` | 45/45 decode tests PASS |
 | `make test-memory` | 18/18 memory tests PASS |
 | `make test-regfile` | 37/37 register tests PASS |
-| `make test-compliance` | 5/5 PASS (3 skipped) |
-| `make test-benchmark` | 10 instructions in 10 cycles (IPC=1.0 active) |
+| `make test-immgen` | 8/8 immediate tests PASS |
+| `make test-pc` | 8/8 PC tests PASS |
+| `make test-divider` | 884/884 divider checks PASS |
+| `make test-compliance` | 41/41 directed ISA checks PASS |
+| `make test-benchmark` | 11 non-NOP instr / 14 cycles (IPC ≈ 0.786) |
 
 ## Common Issues
 

@@ -63,6 +63,7 @@ puts "Progress: $synth_progress"
 
 if {$synth_progress == "100%"} {
     puts "SYNTHESIS: PASSED"
+    set lint_ok 1
 
     # Open synthesized design for reports
     open_run synth_1 -name synth_1
@@ -90,10 +91,15 @@ if {$synth_progress == "100%"} {
 } else {
     puts "SYNTHESIS: FAILED"
     puts "Check logs for errors."
+    set lint_ok 0
 }
 
 puts "========================================="
 
 # Save and close
 close_project
-puts "Lint check completed."
+if {!$lint_ok} {
+    puts "Lint check FAILED."
+    exit 1
+}
+puts "Lint check completed successfully."

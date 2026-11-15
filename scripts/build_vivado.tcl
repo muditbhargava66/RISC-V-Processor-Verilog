@@ -36,6 +36,11 @@ set memory_image [riscv_build::get_memory_image]
 riscv_build::add_source_files $core_files $memory_image
 riscv_build::add_wrapper_file $wrapper_file
 
+# The jtag wrapper instantiates ILA/VIO black boxes; create the matching IP.
+if {$target eq "jtag"} {
+    riscv_build::create_debug_ip 1024
+}
+
 if {![riscv_build::add_constraint_file $constraint_file]} {
     close_project
     exit 1

@@ -101,15 +101,15 @@ set_property CFGBVS VCCO [current_design]
 set_property CONFIG_VOLTAGE 3.3 [current_design]
 ```
 
-### Resource Usage (Synthesis)
+### Resource Usage (verified v1.2.0 post-route, minimal)
 
 | Resource | Usage | Available | Utilization |
 |----------|-------|-----------|-------------|
-| LUTs | ~4,100 | 20,800 | ~19.7% |
-| FFs | ~8,400 | 41,600 | ~20.2% |
-| DSPs | 2 | 90 | 2.2% |
+| LUTs | 540 | 20,800 | 2.60% |
+| FFs | 227 | 41,600 | 0.55% |
+| DSPs | 0 | 90 | 0% |
 | BRAM | 0 | 50 | 0% |
-| I/O | 18 | 88 | 20.5% |
+| I/O | 18 | 106 | 16.98% |
 
 ## Module: `riscv_processor_jtag_debug`
 
@@ -122,8 +122,7 @@ set_property CONFIG_VOLTAGE 3.3 [current_design]
 module riscv_processor_jtag_debug #(
     parameter int XLEN = 32,
     parameter bit ENABLE_M = 1'b1,
-    parameter bit ENABLE_C = 1'b0,
-    parameter int ILA_DEPTH = 1024
+    parameter bit ENABLE_C = 1'b0
 )(
     input  logic        clk,
     input  logic        reset,
@@ -153,9 +152,8 @@ module riscv_processor_jtag_debug #(
 ### Explicit ILA Instantiation
 
 ```systemverilog
-ila_riscv_processor #(
-    .C_DATA_DEPTH (ILA_DEPTH)
-) u_ila (
+// IP generated in-project; the stub exposes no parameters (no depth override).
+ila_riscv_processor u_ila (
     .clk     (clk),
     .probe0  (pc_debug),             // [31:0] Program Counter
     .probe1  (instruction_debug),    // [31:0] Current Instruction
@@ -180,7 +178,7 @@ vio_riscv_processor u_vio (
     .clk           (clk),
     .probe_in0     (pc_debug),           // [31:0] PC Status
     .probe_in1     (instruction_debug),  // [31:0] Instruction Status
-    .probe_in2     ({24'd0, instruction_debug[6:0], branch_taken_debug, 
+    .probe_in2     ({17'd0, instruction_debug[6:0], branch_taken_debug,
                      mem_write_debug, mem_read_debug, reg_write_debug,
                      jump_op, branch_op, processor_active, error_flag}),
     .probe_out0    (),  // Control Register (reserved)
@@ -196,51 +194,25 @@ vio_riscv_processor u_vio (
 | `processor_active` | 1 | `\|instruction_debug` | High when instruction non-zero |
 | `error_flag` | 1 | `active && !valid_opcode` | Illegal opcode detected |
 
-### Resource Usage (JTAG Debug Version)
+### Resource Usage (verified v1.2.0 post-route, JTAG)
 
 | Resource | Usage | Available | Utilization |
 |----------|-------|-----------|-------------|
-| LUTs | ~4,200 | 20,800 | ~20.2% |
-| FFs | ~8,500 | 41,600 | ~20.4% |
-| DSPs | 2 | 90 | 2.2% |
-| BRAM | 0 | 50 | 0% |
-| I/O | 12 | 88 | 13.6% |
+| LUTs | 3,352 | 20,800 | 16.12% |
+| FFs | 5,146 | 41,600 | 12.37% |
+| DSPs | 0 | 90 | 0% |
+| BRAM | 12 | 50 | 24% |
+| I/O | 12 | 106 | 11.32% |
 
-### ILA/VIO Black Box Declarations
+### ILA/VIO IP Binding
 
-```systemverilog
-(* dont_touch = "true" *)
-module ila_riscv_processor #(
-    parameter int C_DATA_DEPTH = 1024
-)(
-    input  logic        clk,
-    input  logic [31:0] probe0,
-    input  logic [31:0] probe1,
-    input  logic [31:0] probe2,
-    input  logic [31:0] probe3,
-    input  logic [31:0] probe4,
-    input  logic [31:0] probe5,
-    input  logic [31:0] probe6,
-    input  logic [31:0] probe7,
-    input  logic [31:0] probe8,
-    input  logic [31:0] probe9,
-    input  logic [31:0] probe10,
-    input  logic [31:0] probe11,
-    input  logic [31:0] probe12
-);
-endmodule
-
-(* dont_touch = "true" *)
-module vio_riscv_processor (
-    input  logic        clk,
-    input  logic [31:0] probe_in0,
-    input  logic [31:0] probe_in1,
-    input  logic [31:0] probe_in2,
-    output logic [31:0] probe_out0,
-    output logic [31:0] probe_out1
-);
-endmodule
-```
+The wrapper instantiates `ila_riscv_processor` and `vio_riscv_processor` **by
+name only**. The matching IP is generated in-project by `create_debug_ip` in
+`scripts/riscv_build_common.tcl` (ILA: 13×32-bit probes, depth 1024; VIO: 3 in /
+2 out, 32-bit). The generated IP stubs expose no parameters, so the wrapper must
+not define colliding black-box modules or pass a `C_DATA_DEPTH` override (doing
+so caused Synth 8-9873 / 8-7136). Vivado binds the instantiations to the
+generated IP automatically.
 
 ### Related Documents
 - [JTAG Debug Guide](../debug/ila-vio.md)

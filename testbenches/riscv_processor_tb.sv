@@ -9,6 +9,7 @@ module riscv_processor_tb;
     logic clk;
     logic reset;
     int errors;
+    logic checks_done = 1'b0;
 
     // Instantiate the DUT — all debug ports explicitly unconnected
     riscv_processor dut (
@@ -35,10 +36,13 @@ module riscv_processor_tb;
         forever #5 clk = ~clk;
     end
 
-    // Timeout watchdog
+    // Timeout watchdog (only fails if checks never completed; safe under xsim re-run)
     initial begin
         #1000; // 1us timeout - should be plenty for ~20 cycles
-        $display("ERROR: Testbench timeout reached!");
+        if (!checks_done) begin
+            $display("ERROR: Testbench timeout reached!");
+            $fatal(1, "riscv_processor_tb: timed out before checks completed");
+        end
         $finish;
     end
 
@@ -100,12 +104,14 @@ module riscv_processor_tb;
         $display("----------------------------------------");
 
         // 4. Report final status
+        checks_done = 1'b1;
         if (errors == 0) begin
             $display("ALL TESTS PASSED!");
             $display("The RISC-V processor is behaving as expected.");
         end else begin
             $display("%0d TESTS FAILED!", errors);
             $display("The RISC-V processor has bugs to fix.");
+            $fatal(1, "riscv_processor_tb: %0d register checks failed", errors);
         end
 
         $display("========================================");

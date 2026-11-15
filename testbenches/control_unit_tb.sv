@@ -19,7 +19,7 @@ module control_unit_tb;
     logic        jump;
     logic        alu_src1;
     logic [1:0]  alu_src;
-    logic [3:0]  alu_op;
+    logic [4:0]  alu_op;
     logic [1:0]  reg_write_src;
 
     int test_count = 0;
@@ -53,7 +53,7 @@ module control_unit_tb;
         input logic       expected_jump,
         input logic       expected_alu_src1,
         input logic [1:0] expected_alu_src,
-        input logic [3:0] expected_alu_op,
+        input logic [4:0] expected_alu_op,
         input logic [1:0] expected_reg_write_src,
         input string      inst_name
     );
@@ -144,12 +144,23 @@ module control_unit_tb;
         test_instruction(OPCODE_LUI,   7'b0, 7'b0, 1,0,0,0,0, 1'b0, ALU_SRC_REG, ALU_ADD, WRITE_SRC_IMM, "LUI");
         test_instruction(OPCODE_AUIPC, 7'b0, 7'b0, 1,0,0,0,0, 1'b1, ALU_SRC_IMM, ALU_ADD, WRITE_SRC_ALU, "AUIPC");
 
+        // M-extension decode (funct7=0000001, funct3 per RV32M spec)
+        test_instruction(OPCODE_R_TYPE, 3'b000, FUNCT7_MULDIV, 1,0,0,0,0, 1'b0, ALU_SRC_REG, ALU_MUL,    WRITE_SRC_ALU, "MUL");
+        test_instruction(OPCODE_R_TYPE, 3'b001, FUNCT7_MULDIV, 1,0,0,0,0, 1'b0, ALU_SRC_REG, ALU_MULH,   WRITE_SRC_ALU, "MULH");
+        test_instruction(OPCODE_R_TYPE, 3'b010, FUNCT7_MULDIV, 1,0,0,0,0, 1'b0, ALU_SRC_REG, ALU_MULHSU, WRITE_SRC_ALU, "MULHSU");
+        test_instruction(OPCODE_R_TYPE, 3'b011, FUNCT7_MULDIV, 1,0,0,0,0, 1'b0, ALU_SRC_REG, ALU_MULHU,  WRITE_SRC_ALU, "MULHU");
+        test_instruction(OPCODE_R_TYPE, 3'b100, FUNCT7_MULDIV, 1,0,0,0,0, 1'b0, ALU_SRC_REG, ALU_DIV,    WRITE_SRC_ALU, "DIV");
+        test_instruction(OPCODE_R_TYPE, 3'b101, FUNCT7_MULDIV, 1,0,0,0,0, 1'b0, ALU_SRC_REG, ALU_DIVU,   WRITE_SRC_ALU, "DIVU");
+        test_instruction(OPCODE_R_TYPE, 3'b110, FUNCT7_MULDIV, 1,0,0,0,0, 1'b0, ALU_SRC_REG, ALU_REM,    WRITE_SRC_ALU, "REM");
+        test_instruction(OPCODE_R_TYPE, 3'b111, FUNCT7_MULDIV, 1,0,0,0,0, 1'b0, ALU_SRC_REG, ALU_REMU,   WRITE_SRC_ALU, "REMU");
+
         $display("========================================");
         $display("Control Unit Test Results: %0d/%0d tests passed", pass_count, test_count);
         if (pass_count == test_count) begin
             $display("ALL TESTS PASSED!");
         end else begin
             $display("SOME TESTS FAILED!");
+            $fatal(1, "Control unit testbench: %0d failures", test_count - pass_count);
         end
         $display("========================================");
 

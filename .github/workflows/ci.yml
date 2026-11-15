@@ -1,0 +1,37 @@
+name: CI
+
+# Free open-source RTL regression: Icarus Verilog directed tests + Verilator lint.
+# Ubuntu 24.04 ships Icarus Verilog 12.x, the version this RTL is verified against
+# (Icarus 11.x hangs on the full core; see docs/verification/verification-guide.md).
+# The Vivado xsim / synthesis flows are not run here (no FPGA tools in CI).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  rtl-regression:
+    name: RTL regression (Icarus Verilog + Verilator)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Install open-source HDL tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog verilator make
+
+      - name: Show tool versions
+        run: |
+          iverilog -V 2>&1 | head -n 1
+          verilator --version
+          make --version | head -n 1
+
+      - name: Verilator lint (core)
+        run: make lint-verilator
+
+      - name: Icarus Verilog directed regression
+        run: make iv-all

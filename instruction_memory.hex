@@ -1,3 +1,35 @@
+// =====================================================================
+// Canonical RISC-V test program (RV32I) - instruction_memory.hex
+// =====================================================================
+// Loaded by src/instruction_memory.sv via $readmemh into a 256-word
+// (1 KB) instruction memory. One 32-bit hex instruction per line; the
+// first line maps to PC 0x00000000 and each subsequent line to PC+4.
+// Only the first 12 words are populated; the remaining words are
+// zero-initialized by the memory module, so the $readmemh "Not enough
+// words" note is benign. "//" comments are ignored by $readmemh.
+//
+// Program summary:
+//   Builds 0xDEAD0234 in x1, stores it to data memory[0], reloads it
+//   into x2, then exercises signed branches (BLT taken, BGE not taken)
+//   and ALU adds. Expected final state:
+//     x1 = 0xDEAD0234   x2 = 0xDEAD0234   x3 = 0xFFFFFFFF (-1)
+//     x4 = 0x00000001   x5 = 0x00000002   x6 = 0x00000002
+//     data_memory[0] = 0xDEAD0234
+//
+// PC    Encoding   Instruction           Effect
+// 0x00  DEAD00B7   LUI  x1, 0xDEAD0      x1 = 0xDEAD0000
+// 0x04  23408093   ADDI x1, x1, 0x234    x1 = 0xDEAD0234
+// 0x08  00102023   SW   x1, 0(x0)        mem[0] = 0xDEAD0234
+// 0x0C  00002103   LW   x2, 0(x0)        x2 = 0xDEAD0234
+// 0x10  FFF00193   ADDI x3, x0, -1       x3 = 0xFFFFFFFF
+// 0x14  00100213   ADDI x4, x0, 1        x4 = 0x00000001
+// 0x18  0041C263   BLT  x3, x4, +4       -1 < 1  -> taken (target 0x1C)
+// 0x1C  000002B3   ADD  x5, x0, x0       x5 = 0
+// 0x20  004202B3   ADD  x5, x4, x4       x5 = 2
+// 0x24  0041D263   BGE  x3, x4, +4       -1 >= 1 -> not taken (fall through)
+// 0x28  00420333   ADD  x6, x4, x4       x6 = 2
+// 0x2C  00000013   NOP                   program-end marker
+// =====================================================================
 DEAD00B7
 23408093
 00102023

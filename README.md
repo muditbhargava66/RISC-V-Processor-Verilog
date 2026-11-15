@@ -2,13 +2,13 @@
 
 # RISC-V Processor
 
-[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen)](https://github.com/muditbhargava66/RISC-V-Processor-Verilog-/actions)
-[![License](https://img.shields.io/badge/License-MIT-blue)](https://github.com/muditbhargava66/RISC-V-Processor-Verilog-/blob/main/LICENSE)
-[![SystemVerilog](https://img.shields.io/badge/SystemVerilog-2017-blue)](https://github.com/muditbhargava66/RISC-V-Processor-Verilog-)
+[![CI](https://github.com/muditbhargava66/RISC-V-Processor-Verilog/actions/workflows/ci.yml/badge.svg)](https://github.com/muditbhargava66/RISC-V-Processor-Verilog/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-MIT-blue)](https://github.com/muditbhargava66/RISC-V-Processor-Verilog/blob/main/LICENSE)
+[![SystemVerilog](https://img.shields.io/badge/SystemVerilog-2017-blue)](https://github.com/muditbhargava66/RISC-V-Processor-Verilog)
 [![FPGA Target](https://img.shields.io/badge/FPGA-Artix%207%20XC7A35T-green)](https://www.xilinx.com/products/silicon-devices/fpga/artix-7.html)
 [![RV32I](https://img.shields.io/badge/ISA-RV32I%20Complete-orange)](https://riscv.org/specifications/)
 
-Single-cycle RV32I processor implemented in SystemVerilog with Vivado and Quartus build flows.
+Single-cycle RV32I processor (multi-cycle RV32M divide) implemented in SystemVerilog with Vivado and Quartus build flows. RV32 only.
 
 </div>
 
@@ -43,7 +43,7 @@ build/                        Generated Vivado/Quartus projects (gitignored)
 - Xilinx Vivado 2023.2 or compatible 7-series release (target: xc7a35tcpg236-1 Basys3)
 - Intel Quartus Prime 23.1 or later (for SDC flow)
 - GNU Make (optional, convenience wrapper around Tcl scripts)
-- SymbiYosys and solvers (Yices2, Z3, Boolector) for formal verification
+- SymbiYosys and solvers (Yices2, Z3, Bitwuzla) for formal verification
 
 ## Getting Started
 
@@ -57,8 +57,8 @@ build/                        Generated Vivado/Quartus projects (gitignored)
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/muditbhargava66/RISC-V-Processor-Verilog-.git
-cd RISC-V-Processor-Verilog-
+git clone https://github.com/muditbhargava66/RISC-V-Processor-Verilog.git
+cd RISC-V-Processor-Verilog
 
 # 2. Run lint check (verifies syntax and elaboration)
 make lint
@@ -113,7 +113,7 @@ vivado -mode batch -source scripts/run_simulation.tcl -tclargs <test_name>
    ```bash
    make implement-minimal
    ```
-   Output: `build/vivado/riscv_processor_minimal/riscv_processor_minimal.bit`
+   Output: `build/vivado/riscv_processor_minimal/riscv_processor_minimal.runs/impl_1/riscv_processor_minimal.bit`
 
 3. **Optional: JTAG debug build** (includes ILA/VIO cores):
    ```bash
@@ -130,86 +130,103 @@ Keep images in explicit, version-controlled locations and update test/build conf
 
 - Harvard-style instruction and data memories
 - 32 general-purpose registers, x0 hardwired to zero
-- Single-cycle datapath and control
-- Tests cover ALU operations, decoding, register file, memory access, and a small integration program
+- Single-cycle datapath and control; RV32M divide/remainder use a multi-cycle
+  sequential divider that stalls the core (~32 cycles)
+- RV32 only (`XLEN=32` enforced at elaboration)
+- Tests cover ALU operations, decoding, register file, memory access, the divider,
+  and a small integration program
 
 The decoder and RTL cover RV32I base instruction categories. Full ISA conformance requires the official RISC-V Architectural Test suite, an explicit execution environment, and reproducible pass logs.
 
-## Implementation Results (v1.1.0 on Artix-7 xc7a35tcpg236-1)
+## Implementation Results (verified v1.2.0)
 
-### Synthesis Results (Vivado 2023.2)
+> Reproduced from actual Vivado 2023.2 runs on the `minimal` target
+> (xc7a35tcpg236-1, Basys3). Reports are written to `build/reports/` by
+> `make synthesize` / `make implement-minimal` (build artifacts, not committed).
+> These supersede the old v1.1.0 estimate tables: removing the data-memory reset
+> loop and adding the clock divider changed the resource counts substantially.
 
-| Metric | Value |
-|--------|-------|
-| **Status** | PASSED (0 errors, 0 critical warnings, 3 warnings) |
-| **LUTs** | 4,132 / 20,800 (19.9%) |
-| **Flip-Flops** | 8,416 / 41,600 (20.2%) |
-| **DSP48E1** | 2 / 90 (2.2%) |
-| **Block RAM** | 0 / 50 (0%) |
-| **I/O** | 12 / 88 (13.6%) |
+### Flow status
 
-**Hierarchy Breakdown:**
-| Instance | LUTs | FFs | DSPs |
-|----------|------|-----|------|
-| riscv_processor (top) | 4,132 | 8,416 | 2 |
-| └── dmem_inst (data_memory) | 2,200 | 8,192 | 0 |
-| └── pc_inst (program_counter) | 538 | 32 | 0 |
-| └── regfile_inst (register_file) | 1,394 | 192 | 0 |
+| Stage | Result |
+|-------|--------|
+| Synthesis (`synth_design`) | Complete — 0 errors, 0 unsupported-primitive warnings |
+| Implementation (`opt/place/route`) | Complete — `Router Completed Successfully` |
+| Bitstream (`write_bitstream`) | Complete — `riscv_processor_minimal.bit` (~2.1 MB) |
+| DRC (`report_drc`) | 0 violations |
+| Methodology (`report_methodology`) | 0 violations |
 
-**DSP Utilization:** 2 DSP48E1 blocks (MUL/MULH operations)
+### Resource utilization (post-route)
 
-### Implementation Results (Vivado 2023.2, xc7a35tcpg236-1)
+| Resource | Used | Available | Utilization |
+|----------|------|-----------|-------------|
+| Slice LUTs | 540 | 20,800 | 2.60% |
+| — LUT as logic | 412 | 20,800 | 1.98% |
+| — LUT as distributed RAM | 128 | 9,600 | 1.33% |
+| Slice registers (FF) | 227 | 41,600 | 0.55% |
+| Block RAM | 0 | 50 | 0% |
+| DSP48E1 | 0 | 90 | 0% |
+| BUFG | 2 | 32 | 6.25% |
+| Bonded I/O | 18 | 106 | 16.98% |
+
+The 227 FFs are 225 synchronous-reset core registers plus 2 asynchronous-set
+reset-synchronizer flops. The memories infer as **distributed RAM** (128 LUTs),
+not Block RAM: the single-cycle datapath reads memory combinationally in the
+same cycle, which Block RAM (synchronous read) cannot satisfy without a pipeline
+stage. The RV32M multiplier maps to LUTs/CARRY4, not DSP48. RV32M divide/remainder
+use a sequential restoring divider (`src/divider.sv`); moving the divide out of
+the combinational ALU reduced logic LUTs versus the earlier combinational divider.
+
+### Timing (post-route — all constraints met)
+
+Core clock `clk_core` = 50 MHz (20 ns), generated by dividing the 100 MHz board
+clock `sys_clk_pin` (toggle flop + BUFG).
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| **WNS (Worst Negative Slack)** | +1.771 ns | ✅ MET |
-| **TNS (Total Negative Slack)** | 0.000 ns | ✅ MET |
-| **WHS (Worst Hold Slack)** | +0.124 ns | ✅ MET |
-| **THS (Total Hold Slack)** | 0.000 ns | ✅ MET |
-| **DRC Errors** | 0 | ✅ CLEAN |
-| **Bitstream Generated** | ✅ SUCCESS | `riscv_processor_minimal.bit` |
+| WNS (setup) | +4.134 ns | MET |
+| TNS | 0.000 ns (0 / 1922 endpoints) | MET |
+| WHS (hold) | +0.081 ns | MET |
+| THS | 0.000 ns (0 / 1922 endpoints) | MET |
+| WPWS (pulse width) | +4.500 ns | MET |
 
-**Resource Utilization (Post-Implementation):**
-| Resource | Used | Available | Utilization |
-|----------|------|-----------|-------------|
-| LUTs | 4,132 | 20,800 | 19.9% |
-| FFs | 8,416 | 41,600 | 20.2% |
-| DSP48E1 | 2 | 90 | 2.2% |
-| BRAM | 0 | 50 | 0% |
-| I/O | 18 | 88 | 20.5% |
+`report_timing_summary`: **"All user specified timing constraints are met."**
+The worst core path (~15.9 ns) is the single-cycle datapath including the
+divider's registered iteration logic; the design has margin to ~63 MHz but is
+constrained at 50 MHz. `check_timing` reports 0 unconstrained endpoints, 0
+combinational loops, and 0 disconnected generated clocks; the only notes are the
+intentional false-path exceptions on the async reset input and the 16 LED outputs.
 
-**Timing Summary (50 MHz / 20 ns period):**
-| Corner | WNS (ns) | TNS (ns) | WHS (ns) | THS (ns) |
-|--------|----------|----------|----------|----------|
-| Slow (max) | +1.771 | 0.000 | +0.124 | 0.000 |
-| Fast (min) | +1.771 | 0.000 | +0.124 | 0.000 |
+### CDC / clock interaction
 
-**Power Estimation (Vector-less):**
-- Total Power: ~127 mW
-- Dynamic: ~53 mW (42%)
-- Static: ~74 mW (58%)
-- Junction Temp: ~25.6°C
+- `report_cdc`: 1 crossing (async reset port → `clk_core`), **Safe = 1,
+  Unsafe = 0, Unknown = 0, No ASYNC_REG = 0** — handled by the 2-FF `ASYNC_REG`
+  reset synchronizer and a `set_false_path` exception.
+- `report_clock_interaction`: both clock pairs **Clean / Timed**; the inter-clock
+  table is empty (no data paths cross between the 100 MHz divider flop and the
+  50 MHz core).
 
-### Synthesis Results (v1.1.0)
+### Power (vector-less estimate, medium confidence)
 
 | Metric | Value |
 |--------|-------|
-| **Errors** | 0 |
-| **Critical Warnings** | 0 |
-| **Warnings** | 3 (unused address bits - expected) |
-| **Critical Path** | ~9.5 ns (ALU → D-MEM → Writeback) |
-| **Max Frequency** | >100 MHz (50 MHz target with 100%+ margin) |
+| Total on-chip power | 88 mW |
+| Dynamic | 16 mW |
+| Device static | 72 mW |
+| Junction temperature | 25.4 °C |
 
-### Hierarchy Breakdown (Synthesis)
+### Full-core characterization
 
-| Instance | Module | LUTs | FFs | DSPs |
-|----------|--------|------|-----|------|
-| riscv_processor (top) | 4,132 | 8,416 | 2 |
-| └── dmem_inst | data_memory | 2,200 | 8,192 | 0 |
-| └── pc_inst | program_counter | 538 | 32 | 0 |
-| └── regfile_inst | register_file | 1,394 | 192 | 0 |
+The numbers above are for the Basys3 minimal wrapper, which trims unexposed core
+logic to fit the board's 106 I/O. `make full-core` synthesizes and implements the
+complete `riscv_processor` (all 241 debug I/O retained) on `xc7a35tfgg484-1` — the
+same xc7a35t die and -1 speed grade as Basys3, in a larger 250-I/O package. The
+routed full core uses **596 LUTs (468 logic + 128 distributed RAM), 224 FF, 0 DSP /
+0 BRAM**, meets 50 MHz with **WNS +5.462 ns**, and estimates **95 mW**. See
+[Full-core characterization](docs/fpga/full-core-characterization.md) for the
+comprehensive report set and the wrapper-vs-core comparison.
 
-**Synthesis Warnings:** 3 (unused address bits on I-MEM/D-MEM - expected for 8-bit address width)
+![Full core vs minimal wrapper routed resources](docs/images/resource-utilization.svg)
 
 ## Verification
 
@@ -221,31 +238,35 @@ make test-all
 
 | Test | Scope | Result |
 |------|-------|--------|
-| `test-system` | Full program execution (11 instructions) | 6/6 register checks PASS |
-| `test-alu` | 24 ALU operation vectors | 24/24 PASS |
-| `test-control` | 37 decode vectors | 37/37 PASS |
+| `test-system` | Full program execution | 6/6 register checks PASS |
+| `test-alu` | 21 ALU vectors (RV32I + RV32M multiply) | 21/21 PASS |
+| `test-control` | 45 decode vectors (RV32I + RV32M) | 45/45 PASS |
 | `test-memory` | I-MEM/D-MEM access patterns | 18/18 PASS |
 | `test-regfile` | Register read/write, x0 behavior | 37/37 PASS |
+| `test-immgen` | I/S/B/U/J immediate generation | 8/8 PASS |
+| `test-pc` | PC reset/update/hold (stall) | 8/8 PASS |
+| `test-divider` | RV32M divide: corners, directed, 200 random, handshake | 884/884 PASS |
 
 ### Diagnostic Checks
 
 ```bash
-make test-compliance   # RV32I smoke checks (5/5 PASS, 3 skipped)
-make test-formal       # SVA assertion simulation (15 assertions, 12 covers)
-make test-benchmark    # IPC measurement (10 instr / 10 cycles = 1.0 IPC active)
-make test-benchmark    # Full run: 0.020 IPC over 500 cycles (includes NOP padding)
+make test-compliance   # Directed ISA compliance harness (41 checks PASS)
+make test-formal       # SVA assertion simulation (14 inline assertions; xsim ignores covers)
+make test-benchmark    # Bounded diagnostic: 11 non-NOP instr / 14 cycles, IPC ~0.786
 ```
 
 ### Formal Verification (SymbiYosys)
 
 ```bash
-sby -f verification/formal.sby      # Full proof (BMC + PDR + ABC)
+sby -f verification/formal.sby      # Prove (smtbmc + abc pdr, unbounded)
 sby -f verification/formal_bmc.sby  # Bounded model checking
 sby -f verification/formal_cover.sby # Coverage collection
 sby -f verification/formal_core.sby  # Core-only prove
 ```
 
-**SVA Properties:** 15 assertions + 12 cover properties (inline in `riscv_processor.sv`)
+**SVA Properties:** 14 assertions + 15 cover properties (inline in `riscv_processor.sv`, simulation-only). xsim evaluates the assertions but ignores `cover property`; the covers are exercised by the SymbiYosys cover flow. The Yosys-friendly formal contract lives in `verification/riscv_processor_sva.sv` (4 assertions + 3 covers).
+
+**Formal results (verified v1.2.0, OSS CAD Suite):** all four configs PASS — `formal.sby` and `formal_core.sby` prove the wrapper assertions unbounded (abc pdr, <1 s); `formal_cover.sby` reaches all 3 cover points; `formal_bmc.sby` passes to depth 12 (bitwuzla). The frontend is `read_slang` (yosys-slang), required for the SV package/enums.
 
 ### Lint/Synthesis Check
 
@@ -253,7 +274,11 @@ sby -f verification/formal_core.sby  # Core-only prove
 make lint
 ```
 
-**Result:** SYNTHESIS PASSED (0 errors, 0 critical warnings, 3 warnings)
+**Result:** SYNTHESIS PASSED (0 errors, 0 critical warnings). The standalone-core
+lint reports 59 benign warnings: 50 unused debug port/signal warnings (the core's
+wide debug ports have no load when synthesized alone), 7 package-parameter-as-
+localparam notes, 1 zero-replication note (the RV32 U-type sign-extension), and 1
+parallel-synthesis info. Verilator `--lint-only -Wall --assert` is clean (0 warnings).
 
 ## Documentation
 

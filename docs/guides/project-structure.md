@@ -11,15 +11,19 @@ RISC-V-Processor-Verilog/
 │   ├── immediate_generator.sv    # Immediate extraction
 │   ├── instruction_memory.sv     # Parameterized I-MEM
 │   ├── data_memory.sv            # Parameterized D-MEM
+│   ├── divider.sv                # RV32M sequential restoring divider
 │   ├── riscv_processor.sv        # Top-level core (with inline SVA)
 │   ├── riscv_processor_minimal.sv     # Minimal I/O wrapper
 │   └── riscv_processor_jtag_debug.sv  # JTAG/ILA/VIO wrapper
 │
 ├── testbenches/                  # Simulation Testbenches (SystemVerilog)
-│   ├── alu_tb.sv                 # ALU exhaustive tests
+│   ├── alu_tb.sv                 # ALU tests (base + RV32M multiply)
 │   ├── control_unit_tb.sv        # Control decode tests
 │   ├── memory_tb.sv              # I-MEM/D-MEM tests
 │   ├── register_file_tb.sv       # Register file tests
+│   ├── immediate_generator_tb.sv # Immediate generation tests
+│   ├── program_counter_tb.sv     # PC reset/update/hold tests
+│   ├── divider_tb.sv             # RV32M divider tests (884 checks)
 │   └── riscv_processor_tb.sv     # System self-checking test
 │
 ├── verification/                 # Formal & Compliance Verification
@@ -132,6 +136,7 @@ riscv_processor.sv (top)
 ├── register_file.sv
 ├── control_unit.sv
 ├── alu.sv
+├── divider.sv
 └── data_memory.sv
 ```
 
@@ -139,9 +144,10 @@ riscv_processor.sv (top)
 
 | File | Description | Lines |
 |------|-------------|-------|
-| `riscv_pkg.sv` | Common types, enums, opcodes, utilities | ~240 |
-| `alu.sv` | ALU with M-extension (MUL/DIV) | ~80 |
-| `control_unit.sv` | Full RV32I decode | ~180 |
+| `riscv_pkg.sv` | Common types, enums, opcodes, utilities | ~210 |
+| `alu.sv` | ALU: base RV32I + RV32M multiply | ~120 |
+| `divider.sv` | RV32M sequential restoring divider | ~150 |
+| `control_unit.sv` | Full RV32I decode + is_div | ~190 |
 | `register_file.sv` | 32×32 sync reset | ~45 |
 | `program_counter.sv` | PC with branch/jump | ~25 |
 | `immediate_generator.sv` | All immediate formats | ~50 |

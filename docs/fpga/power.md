@@ -18,25 +18,35 @@ open_run impl_1
 report_power -file power_report.rpt
 ```
 
-## Power Components
+## Power Components (verified v1.2.0, vector-less)
 
-| Component | Typical Value | Notes |
-|-----------|---------------|-------|
-| **Dynamic Power** | ~53 mW | Switching activity |
-| **Static Power** | ~74 mW | Leakage |
-| **Total Power** | ~127 mW | Estimated |
+Reproduced from `build/reports/power_minimal_impl.rpt` (Vivado 2023.2, routed
+minimal design, xc7a35tcpg236-1). Overall confidence: **Medium** (vector-less;
+internal-node activity is estimated, not from simulation).
 
-### Breakdown by Module
+| Component | Value | Notes |
+|-----------|-------|-------|
+| **Dynamic Power** | 16 mW | Switching activity |
+| **Device Static Power** | 72 mW | Leakage |
+| **Total On-Chip Power** | 88 mW | |
+| **Junction Temperature** | 25.4 °C | Ambient 25 °C, θJA 5.0 °C/W |
 
-| Module | Dynamic (mW) | Static (mW) | Total (mW) | % of Total |
-|--------|-------------|-------------|------------|------------|
-| Data Memory | ~25 | ~35 | ~60 | 47% |
-| Register File | ~10 | ~20 | ~30 | 24% |
-| ALU | ~8 | ~5 | ~13 | 10% |
-| Control Unit | ~5 | ~3 | ~8 | 6% |
-| PC / Immediate Gen | ~3 | ~2 | ~5 | 4% |
-| Instruction Memory | ~2 | ~2 | ~4 | 3% |
-| **Total** | **~53** | **~74** | **~127** | **100%** |
+### Where the dynamic power goes
+
+The core logic is tiny (540 LUTs / 227 FFs), so dynamic power is dominated by
+I/O, not the datapath:
+
+| Block | Dynamic Power |
+|-------|---------------|
+| I/O (18 pins) | ~14 mW |
+| Core logic (`u_riscv_processor`) | ~2 mW |
+| — of which `pc_inst` | ~1 mW |
+| Clocks (2 BUFG) | ~1 mW |
+| Slice logic / signals / distributed RAM | <1 mW each |
+
+(The earlier per-module table that attributed ~60 mW to data memory was a
+v1.1.0 estimate from the flip-flop-based memory; that reset loop was removed in
+v1.2.0, so the memory is now distributed RAM and draws negligible dynamic power.)
 
 ## Power Optimization
 
@@ -69,11 +79,11 @@ report_power -file power_report.rpt
 
 ### Key Metrics
 
-| Metric | Target | Typical |
+| Metric | Target | Actual (v1.2.0) |
 |--------|--------|---------|
-| Junction Temp | < 85°C | ~25°C |
-| Thermal Margin | > 10°C | ~60°C |
-| Power Budget | < 500 mW | ~127 mW |
+| Junction Temp | < 85°C | 25.4°C |
+| Thermal Margin | > 10°C | ~59°C |
+| Total Power | < 500 mW | 88 mW |
 
 ## Power Constraints
 
@@ -97,25 +107,18 @@ report_power -vectorless_activity_propagation
 
 ### Junction Temperature Calculation
 ```
-Tj = Ta + (Pd * θja)
+Tj = Ta + (Pd * θJA)
 ```
-- Ta: Ambient temperature (25°C)
-- Pd: Total power dissipation (0.127 W)
-- θja: Junction-to-ambient thermal resistance (~25°C/W for CPG236)
+- Ta: Ambient temperature (25 °C)
+- Pd: Total power dissipation (0.085 W)
+- θJA: Junction-to-ambient thermal resistance (5.0 °C/W for CPG236 with the
+  report's medium heatsink / 250 LFM airflow environment)
 
 ### Result
 ```
-Tj = 25 + (0.127 * 25) = 28.2°C
+Tj = 25 + (0.085 * 5.0) = 25.4 °C
 ```
-**Margin**: 85°C - 28.2°C = 56.8°C
-
-## Power Budget
-
-| Component | Budget (mW) | Actual (mW) | Margin |
-|-----------|-------------|-------------|--------|
-| Core Logic | 200 | 127 | 73 mW |
-| I/O | 100 | ~20 | 80 mW |
-| **Total** | **300** | **~147** | **153 mW** |
+**Margin**: 85 °C - 25.4 °C = 59.6 °C (matches the report's 25.4 °C junction).
 
 ## Related Documents
 - [Basys3 Build Guide](basys3-guide.md)

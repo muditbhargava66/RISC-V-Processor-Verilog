@@ -54,7 +54,7 @@ always_comb begin
   // Default assignments
   result = '0;
   
-  unique case (sel)
+  case (sel)
     2'b00: result = a + b;
     2'b01: result = a - b;
     default: result = '0;
@@ -78,7 +78,7 @@ end
 // Always assign in all branches
 always_comb begin
   result = '0;  // Default
-  unique case (sel)
+  case (sel)
     2'b00: result = a;
     2'b01: result = b;
     default: result = '0;  // Explicit default
@@ -88,14 +88,17 @@ end
 
 ### Case Statements
 ```systemverilog
-// Use unique_case for parallel case synthesis
-unique case (opcode)
+// Project convention (audit item M10): plain `case` with an explicit `default`.
+// Illegal/unreachable encodings fall to the default and are flagged by the
+// top-level trap logic. We avoid `unique case` because it emits simulation
+// violation warnings on illegal encodings that the trap logic already handles.
+case (opcode)
   OPCODE_ADD: result = a + b;
   OPCODE_SUB: result = a - b;
   default: result = '0;
 endcase
 
-// For priority encoding, use case (not unique_case)
+// For priority encoding, use casez
 casez (priority_req)
   4'b1???: grant = 4'b0001;
   4'b01??: grant = 4'b0010;
@@ -253,7 +256,7 @@ logic signal;  // Brief description
 ### SystemVerilog Features Used
 - `logic` type
 - `always_comb` / `always_ff`
-- `unique_case` / `unique casez`
+- `case` / `casez` with explicit `default` (plain case, not `unique case`)
 - `packed` arrays
 - `enum` types
 - `package` / `import`

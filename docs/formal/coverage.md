@@ -46,18 +46,8 @@ depth 30
 smtbmc
 
 [script]
-read_verilog -I ../src ../src/riscv_pkg.sv
-read_verilog -I ../src ../src/alu.sv
-read_verilog -I ../src ../src/immediate_generator.sv
-read_verilog -I ../src ../src/program_counter.sv
-read_verilog -I ../src ../src/register_file.sv
-read_verilog -I ../src ../src/instruction_memory.sv
-read_verilog -I ../src ../src/data_memory.sv
-read_verilog -I ../src ../src/control_unit.sv
-read_verilog -I ../src ../src/riscv_processor.sv
-read_verilog -I ../verification ../verification/riscv_processor_sva.sv
-
-prep -top riscv_processor_sva
+read_slang --top riscv_processor_sva -D IVERILOG riscv_pkg.sv alu.sv immediate_generator.sv program_counter.sv register_file.sv instruction_memory.sv data_memory.sv control_unit.sv divider.sv riscv_processor.sv riscv_processor_sva.sv
+prep -top riscv_processor_sva -flatten
 
 [files]
 ../src/riscv_pkg.sv
@@ -68,6 +58,7 @@ prep -top riscv_processor_sva
 ../src/instruction_memory.sv
 ../src/data_memory.sv
 ../src/control_unit.sv
+../src/divider.sv
 ../src/riscv_processor.sv
 ../verification/riscv_processor_sva.sv
 ```

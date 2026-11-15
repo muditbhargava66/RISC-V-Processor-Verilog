@@ -1,16 +1,30 @@
-// RISC-V Processor Performance Benchmark
-// Measures performance metrics and compares against targets
-// SystemVerilog implementation with proper instruction memory loading
+// RISC-V Processor Performance Diagnostic
+//
+// Measures instruction-level activity over the canonical program in
+// instruction_memory.hex. This is a BOUNDED DIAGNOSTIC over a ~12-instruction
+// program, not a sustained performance measurement (e.g. Dhrystone/CoreMark).
+//
+// Honesty notes (v1.2.0):
+//  - The clock here is the SIMULATION testbench clock (100 MHz), NOT a measured
+//    FPGA frequency. The synthesized core targets 50 MHz on Basys3; real
+//    post-route timing is in build/reports/timing_minimal_impl.rpt.
+//  - This single-cycle core has no branch predictor, so no "prediction
+//    accuracy" is reported — only the observed branch-taken rate.
+//  - No pass/fail "target frequency" or "MIPS target" is asserted; such targets
+//    are meaningless for a 12-instruction program.
+//  - The instruction mix counts every non-NOP instruction exactly once, so the
+//    category percentages sum to 100%.
 
 `timescale 1ns / 1ps
 
 module performance_benchmark;
 
-    // Test infrastructure
+    localparam real CLK_PERIOD_NS = 10.0;  // simulation testbench clock (100 MHz)
+
     logic clk;
     logic reset;
 
-    // Processor interface
+    // Processor debug interface
     logic [31:0] pc_debug;
     logic [31:0] instruction_debug;
     logic [31:0] alu_result_debug;
@@ -24,32 +38,31 @@ module performance_benchmark;
     logic        mem_read_debug;
     logic        mem_write_debug;
     logic        branch_taken_debug;
+    logic        trap;
 
-    // Performance counters
+    // Activity counters (non-NOP instructions only)
     int total_cycles = 0;
+    int end_cycle = 0;
     int instruction_count = 0;
     int branch_count = 0;
     int branch_taken_count = 0;
     int load_count = 0;
     int store_count = 0;
     int alu_op_count = 0;
+    int lui_auipc_count = 0;
+    int jump_count = 0;
+    int other_count = 0;
     int nop_streak = 0;
     logic program_end_detected = 1'b0;
 
-    // Timing measurements
-    real start_time = 0.0;
-    real end_time = 0.0;
+    // Derived metrics
+    real ipc = 0.0;
     real execution_time = 0.0;
 
-    // Performance metrics
-    real ipc = 0.0;
-    real branch_prediction_accuracy = 0.0;
-    real clock_frequency = 100.0; // MHz
-
-    // Clock generation - 100MHz
+    // 100 MHz simulation clock
     initial begin
         clk = 0;
-        forever #5 clk = ~clk;
+        forever #(CLK_PERIOD_NS / 2.0) clk = ~clk;
     end
 
     // DUT instantiation
@@ -68,120 +81,109 @@ module performance_benchmark;
         .reg_write_debug      (reg_write_debug),
         .mem_read_debug       (mem_read_debug),
         .mem_write_debug      (mem_write_debug),
-        .branch_taken_debug   (branch_taken_debug)
+        .branch_taken_debug   (branch_taken_debug),
+        .trap                 (trap)
     );
 
-    // Performance monitoring
-    logic [31:0] prev_pc;
-
+    // Activity monitoring. The single-cycle core fetches one instruction per
+    // cycle; NOP/zero filler is excluded so the instruction mix sums to 100%.
     always_ff @(posedge clk) begin
         if (reset) begin
-            prev_pc <= 32'h00000000;
+            total_cycles         <= 0;
+            instruction_count    <= 0;
+            branch_count         <= 0;
+            branch_taken_count   <= 0;
+            load_count           <= 0;
+            store_count          <= 0;
+            alu_op_count         <= 0;
+            lui_auipc_count      <= 0;
+            jump_count           <= 0;
+            other_count          <= 0;
+            nop_streak           <= 0;
+            program_end_detected <= 1'b0;
         end else begin
             total_cycles <= total_cycles + 1;
 
             if (!program_end_detected) begin
-                // Count instructions (PC changes indicate new instruction)
-                if (pc_debug != prev_pc || total_cycles == 1) begin
+                if (instruction_debug != 32'h00000013 &&
+                    instruction_debug != 32'h00000000) begin
                     instruction_count <= instruction_count + 1;
-
-                    // Classify instruction types
                     case (instruction_debug[6:0])
                         7'b1100011: begin // Branch
                             branch_count <= branch_count + 1;
-                            if (branch_taken_debug) begin
+                            if (branch_taken_debug)
                                 branch_taken_count <= branch_taken_count + 1;
-                            end
                         end
-                        7'b0000011: begin // Load
-                            load_count <= load_count + 1;
-                        end
-                        7'b0100011: begin // Store
-                            store_count <= store_count + 1;
-                        end
-                        7'b0110011, 7'b0010011: begin // R-type, I-type ALU
-                            alu_op_count <= alu_op_count + 1;
-                        end
+                        7'b0000011: load_count      <= load_count + 1;      // Load
+                        7'b0100011: store_count     <= store_count + 1;     // Store
+                        7'b0110011,
+                        7'b0010011: alu_op_count    <= alu_op_count + 1;    // R/I-type ALU
+                        7'b0110111,
+                        7'b0010111: lui_auipc_count <= lui_auipc_count + 1; // LUI/AUIPC
+                        7'b1101111,
+                        7'b1100111: jump_count      <= jump_count + 1;      // JAL/JALR
+                        default:    other_count     <= other_count + 1;     // SYSTEM/FENCE/etc.
                     endcase
-                end
-            end
-            prev_pc <= pc_debug;
-
-            // Detect program end: consecutive NOPs/zero instructions
-            if (instruction_debug == 32'h00000013 || instruction_debug == 32'h00000000) begin
-                nop_streak <= nop_streak + 1;
-                if (nop_streak >= 3) begin
-                    if (!program_end_detected) begin
+                    nop_streak <= 0;
+                end else begin
+                    // NOP/zero filler: watch for the program-end tail.
+                    nop_streak <= nop_streak + 1;
+                    if (nop_streak >= 2) begin
                         program_end_detected <= 1'b1;
-                        // Subtract the NOP streak from instruction count
-                        instruction_count <= instruction_count - nop_streak;
-                        $display("Program end detected after %0d real instructions", instruction_count - nop_streak);
+                        end_cycle <= total_cycles + 1;
+                        $display("Program end detected: %0d non-NOP instructions in %0d cycles",
+                                 instruction_count, total_cycles + 1);
                     end
                 end
-            end else begin
-                nop_streak <= 0;
             end
         end
     end
 
-    // Performance analysis task
+    // Diagnostic report
     task automatic analyze_performance();
+        int window_cycles;
         begin
-            // Calculate metrics
-            ipc = (total_cycles > 0) ? ($itor(instruction_count) / $itor(total_cycles)) : 0.0;
-            branch_prediction_accuracy = (branch_count > 0) ?
-                (($itor(branch_count - branch_taken_count) / $itor(branch_count)) * 100.0) : 0.0;
-            execution_time = total_cycles * 10.0; // ns (10ns per cycle at 100MHz)
+            window_cycles  = (end_cycle > 0) ? end_cycle : total_cycles;
+            ipc            = (window_cycles > 0) ? ($itor(instruction_count) / $itor(window_cycles)) : 0.0;
+            execution_time = window_cycles * CLK_PERIOD_NS;
 
             $display("========================================");
-            $display("PERFORMANCE ANALYSIS REPORT");
+            $display("PERFORMANCE DIAGNOSTIC (bounded program)");
             $display("========================================");
-            $display("Execution Metrics:");
-            $display("- Total Cycles: %0d", total_cycles);
-            $display("- Instructions Executed: %0d", instruction_count);
-            $display("- Execution Time: %0.1f ns", execution_time);
-            $display("- Clock Frequency: %0.1f MHz", clock_frequency);
+            $display("Simulation clock: %0.1f MHz (testbench; NOT measured FPGA Fmax)",
+                     1000.0 / CLK_PERIOD_NS);
+            $display("Active window: %0d cycles, %0d non-NOP instructions",
+                     window_cycles, instruction_count);
+            $display("Execution time (sim): %0.1f ns", execution_time);
             $display("");
-
-            $display("Performance Metrics:");
-            $display("- Instructions Per Cycle (IPC): %0.3f", ipc);
-            $display("- Cycles Per Instruction (CPI): %0.3f", (ipc > 0) ? (1.0/ipc) : 0.0);
-            $display("- Instruction Throughput: %0.1f MIPS",
-                    (execution_time > 0) ? (instruction_count / (execution_time / 1000.0)) : 0.0);
+            $display("Instructions Per Cycle (IPC): %0.3f", ipc);
+            $display("Cycles Per Instruction (CPI): %0.3f", (ipc > 0) ? (1.0 / ipc) : 0.0);
             $display("");
-
-            $display("Instruction Mix:");
+            $display("Instruction Mix (sums to 100%%):");
             if (instruction_count > 0) begin
-                $display("- ALU Operations: %0d (%0.1f%%)", alu_op_count,
-                        ($itor(alu_op_count) / $itor(instruction_count)) * 100.0);
-                $display("- Load Instructions: %0d (%0.1f%%)", load_count,
-                        ($itor(load_count) / $itor(instruction_count)) * 100.0);
-                $display("- Store Instructions: %0d (%0.1f%%)", store_count,
-                        ($itor(store_count) / $itor(instruction_count)) * 100.0);
-                $display("- Branch Instructions: %0d (%0.1f%%)", branch_count,
-                        ($itor(branch_count) / $itor(instruction_count)) * 100.0);
+                $display("- ALU (R/I-type):  %0d (%0.1f%%)", alu_op_count,
+                         100.0 * $itor(alu_op_count) / $itor(instruction_count));
+                $display("- Load:            %0d (%0.1f%%)", load_count,
+                         100.0 * $itor(load_count) / $itor(instruction_count));
+                $display("- Store:           %0d (%0.1f%%)", store_count,
+                         100.0 * $itor(store_count) / $itor(instruction_count));
+                $display("- Branch:          %0d (%0.1f%%)", branch_count,
+                         100.0 * $itor(branch_count) / $itor(instruction_count));
+                $display("- LUI/AUIPC:       %0d (%0.1f%%)", lui_auipc_count,
+                         100.0 * $itor(lui_auipc_count) / $itor(instruction_count));
+                $display("- Jump (JAL/JALR): %0d (%0.1f%%)", jump_count,
+                         100.0 * $itor(jump_count) / $itor(instruction_count));
+                $display("- Other:           %0d (%0.1f%%)", other_count,
+                         100.0 * $itor(other_count) / $itor(instruction_count));
             end
             $display("");
-
-            $display("Branch Analysis:");
-            $display("- Total Branches: %0d", branch_count);
-            $display("- Branches Taken: %0d", branch_taken_count);
-            $display("- Branch Taken Rate: %0.1f%%",
-                    (branch_count > 0) ? (($itor(branch_taken_count) / $itor(branch_count)) * 100.0) : 0.0);
+            $display("Branch Activity (no predictor in this core):");
+            $display("- Branches: %0d, taken: %0d, taken rate: %0.1f%%",
+                     branch_count, branch_taken_count,
+                     (branch_count > 0) ? 100.0 * $itor(branch_taken_count) / $itor(branch_count) : 0.0);
             $display("");
-
-            $display("Performance Targets:");
-            $display("- Diagnostic IPC over bounded program: %0.3f", ipc);
-            $display("- Target Frequency: 100 MHz - %s",
-                    (clock_frequency >= 100.0) ? "PASS" : "FAIL");
-            $display("- Target Throughput: >90 MIPS - %s",
-                    ((instruction_count / (execution_time / 1000.0)) >= 90.0) ? "PASS" : "FAIL");
-            $display("");
-
-            // Performance note
-            $display("NOTE: This is a diagnostic metric over the bounded program region.");
-            $display("      It is not a sustained processor performance measurement.");
-
+            $display("NOTE: Diagnostic over the canonical ~12-instruction program.");
+            $display("      Not a sustained performance measurement; no pass/fail targets.");
             $display("========================================");
         end
     endtask
@@ -189,56 +191,25 @@ module performance_benchmark;
     // Benchmark execution
     initial begin
         $display("========================================");
-        $display("RISC-V Processor Performance Benchmark");
-        $display("Measuring Single-Cycle Architecture Performance");
+        $display("RISC-V Processor Performance Diagnostic");
         $display("========================================");
 
-        // Initialize
         reset = 1;
         #50;
         reset = 0;
-        start_time = $realtime;
 
-        $display("Starting performance benchmark...");
-        $display("Running processor for performance measurement...");
+        // Run long enough to finish the program and detect the NOP tail.
+        #5000;
 
-        // Run for sufficient time to get meaningful measurements
-        #5000; // 5us execution time
-
-        end_time = $realtime;
-
-        // Analyze performance
         analyze_performance();
-
-        // Additional detailed analysis
-        $display("Detailed Analysis:");
-        $display("- Average Instruction Execution Time: %0.1f ns",
-                (instruction_count > 0) ? (execution_time / instruction_count) : 0.0);
-        $display("- Memory Access Efficiency: %0.1f%% (Load+Store/Total)",
-                (instruction_count > 0) ? (($itor(load_count + store_count) / $itor(instruction_count)) * 100.0) : 0.0);
-        $display("- Computational Intensity: %0.1f%% (ALU/Total)",
-                (instruction_count > 0) ? (($itor(alu_op_count) / $itor(instruction_count)) * 100.0) : 0.0);
-
-        $display("========================================");
-        $display("Performance benchmark completed successfully!");
-        $display("========================================");
-
+        $display("Performance diagnostic completed.");
         $finish;
-    end
-
-    // Progress monitoring
-    always_ff @(posedge clk) begin
-        if (!reset && total_cycles > 0 && total_cycles % 100 == 0) begin
-            $display("Benchmark Progress: %0d cycles, %0d instructions, IPC = %0.3f",
-                    total_cycles, instruction_count,
-                    (total_cycles > 0) ? ($itor(instruction_count) / $itor(total_cycles)) : 0.0);
-        end
     end
 
     // Timeout watchdog
     initial begin
-        #10000; // 10us timeout
-        $display("Performance benchmark timeout reached");
+        #10000;
+        $display("Performance diagnostic timeout reached");
         analyze_performance();
         $finish;
     end

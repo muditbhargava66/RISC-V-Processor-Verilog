@@ -1,6 +1,11 @@
+`timescale 1ns / 1ps
 // Arithmetic Logic Unit (ALU)
-// Complete implementation for all RV32I operations with M-extension support
-// SystemVerilog implementation with parameterized XLEN
+// Combinational RV32I operations plus the RV32M multiply ops.
+// RV32M divide/remainder (DIV/DIVU/REM/REMU) are NOT computed here: they are
+// handled by the multi-cycle sequential divider (see divider.sv) and the core
+// muxes that result into the register write-back path. The divide ALU codes
+// therefore produce zero here and are never used for write-back.
+// SystemVerilog implementation with parameterized XLEN (RV32 only).
 
 module alu #(
     parameter int XLEN = 32,
@@ -8,44 +13,22 @@ module alu #(
 )(
     input  logic [XLEN-1:0] operand_a,
     input  logic [XLEN-1:0] operand_b,
-    input  logic [3:0]      alu_control,
+    input  logic [4:0]      alu_control,
     output logic [XLEN-1:0] result,
     output logic            zero
 );
 
     import riscv_pkg::*;
 
-    // ALU operation codes (using package definitions)
-    localparam logic [3:0] ALU_ADD   = 4'b0000;
-    localparam logic [3:0] ALU_SUB   = 4'b1000;
-    localparam logic [3:0] ALU_AND   = 4'b0111;
-    localparam logic [3:0] ALU_OR    = 4'b0110;
-    localparam logic [3:0] ALU_XOR   = 4'b0100;
-    localparam logic [3:0] ALU_SLL   = 4'b0001;
-    localparam logic [3:0] ALU_SRL   = 4'b0101;
-    localparam logic [3:0] ALU_SRA   = 4'b1101;
-    localparam logic [3:0] ALU_SLT   = 4'b0010;
-    localparam logic [3:0] ALU_SLTU  = 4'b0011;
-
-    // M-extension operations
-    localparam logic [3:0] ALU_MUL   = 4'b1110;
-    localparam logic [3:0] ALU_MULH  = 4'b1111;
-    localparam logic [3:0] ALU_DIV   = 4'b1010;
-    localparam logic [3:0] ALU_REM   = 4'b1011;
-
-    logic [XLEN:0] addsub_result;
+    logic [XLEN:0]     addsub_result;
     logic [2*XLEN-1:0] mul_result;
-    logic [XLEN-1:0] div_result;
-    logic [XLEN-1:0] rem_result;
 
     always_comb begin
-        result = '0;
+        result        = '0;
         addsub_result = '0;
-        mul_result = '0;
-        div_result = '0;
-        rem_result = '0;
+        mul_result    = '0;
 
-        unique case (alu_control)
+        case (alu_control)
             ALU_ADD: begin
                 addsub_result = operand_a + operand_b;
                 result = addsub_result[XLEN-1:0];
@@ -63,10 +46,10 @@ module alu #(
             ALU_SLT: result = ($signed(operand_a) < $signed(operand_b)) ? {{(XLEN-1){1'b0}}, 1'b1} : '0;
             ALU_SLTU: result = (operand_a < operand_b) ? {{(XLEN-1){1'b0}}, 1'b1} : '0;
 
-            // M-extension operations (only synthesized if ENABLE_M=1)
+            // M-extension multiply (synthesized only when ENABLE_M=1)
             ALU_MUL: begin
                 if (ENABLE_M) begin
-                    mul_result = $signed(operand_a) * $signed(operand_b);
+                    mul_result = operand_a * operand_b;   // low bits identical signed/unsigned
                     result = mul_result[XLEN-1:0];
                 end
             end
@@ -76,18 +59,23 @@ module alu #(
                     result = mul_result[2*XLEN-1:XLEN];
                 end
             end
-            ALU_DIV: begin
+            ALU_MULHSU: begin
                 if (ENABLE_M) begin
-                    div_result = (operand_b != 0) ? $signed(operand_a) / $signed(operand_b) : -1;
-                    result = div_result;
+                    // signed a x unsigned b: zero-extend b so it is non-negative
+                    mul_result = $signed(operand_a) * $signed({1'b0, operand_b});
+                    result = mul_result[2*XLEN-1:XLEN];
                 end
             end
-            ALU_REM: begin
+            ALU_MULHU: begin
                 if (ENABLE_M) begin
-                    rem_result = (operand_b != 0) ? $signed(operand_a) % $signed(operand_b) : operand_a;
-                    result = rem_result;
+                    mul_result = operand_a * operand_b;
+                    result = mul_result[2*XLEN-1:XLEN];
                 end
             end
+
+            // Divide/remainder are computed by the sequential divider, not here.
+            // These codes intentionally yield zero; the core selects div_result.
+            ALU_DIV, ALU_DIVU, ALU_REM, ALU_REMU: result = '0;
 
             default: result = '0;
         endcase
@@ -96,8 +84,10 @@ module alu #(
     // Zero flag generation
     assign zero = (result == '0);
 
-    // Synthesis-time assertion for unknown control
+    // Optional simulation-only diagnostic for unknown control (enable with
+    // +define+RISCV_DEBUG). Kept quiet by default to avoid log spam.
     // synthesis translate_off
+`ifdef RISCV_DEBUG
     always_comb begin
         if (alu_control != ALU_ADD && alu_control != ALU_SUB &&
             alu_control != ALU_AND && alu_control != ALU_OR &&
@@ -105,10 +95,13 @@ module alu #(
             alu_control != ALU_SRL && alu_control != ALU_SRA &&
             alu_control != ALU_SLT && alu_control != ALU_SLTU &&
             (!ENABLE_M || (alu_control != ALU_MUL && alu_control != ALU_MULH &&
-                           alu_control != ALU_DIV && alu_control != ALU_REM))) begin
-            $warning("ALU: Unknown alu_control value: %04b", alu_control);
+                           alu_control != ALU_MULHSU && alu_control != ALU_MULHU &&
+                           alu_control != ALU_DIV && alu_control != ALU_DIVU &&
+                           alu_control != ALU_REM && alu_control != ALU_REMU))) begin
+            $warning("ALU: Unknown alu_control value: %05b", alu_control);
         end
     end
+`endif
     // synthesis translate_on
 
 endmodule

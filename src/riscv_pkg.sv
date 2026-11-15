@@ -1,3 +1,4 @@
+`timescale 1ns / 1ps
 // RISC-V Processor Common Package
 // Shared types, parameters, and constants for the RISC-V processor
 // SystemVerilog package for use across all modules
@@ -7,15 +8,13 @@ package riscv_pkg;
     // =====================================================================
     // Architecture Parameters
     // =====================================================================
-    parameter int XLEN = 32;                    // Base ISA width (32 or 64)
+    parameter int XLEN = 32;                    // Base ISA width (RV32 only; enforced at elaboration)
     parameter int REG_ADDR_WIDTH = 5;           // Register address width (5 bits = 32 registers)
     parameter int NUM_REGS = 32;                // Number of architectural registers
 
     // Extension enable parameters
     parameter bit ENABLE_M = 1'b1;              // M-extension (multiply/divide)
-    parameter bit ENABLE_C = 1'b0;              // C-extension (compressed instructions)
-    parameter bit ENABLE_F = 1'b0;              // F-extension (single-precision float)
-    parameter bit ENABLE_D = 1'b0;              // D-extension (double-precision float)
+    parameter bit ENABLE_C = 1'b0;              // C-extension (reserved; compressed decode not implemented)
 
     // Memory parameters
     parameter int IMEM_ADDR_WIDTH = 8;          // Instruction memory address width
@@ -107,21 +106,26 @@ package riscv_pkg;
     // =====================================================================
     // ALU Operations
     // =====================================================================
-    typedef enum logic [3:0] {
-        ALU_ADD   = 4'b0000,
-        ALU_SUB   = 4'b1000,
-        ALU_AND   = 4'b0111,
-        ALU_OR    = 4'b0110,
-        ALU_XOR   = 4'b0100,
-        ALU_SLL   = 4'b0001,
-        ALU_SRL   = 4'b0101,
-        ALU_SRA   = 4'b1101,
-        ALU_SLT   = 4'b0010,
-        ALU_SLTU  = 4'b0011,
-        ALU_MUL   = 4'b1110,    // M-extension
-        ALU_MULH  = 4'b1111,    // M-extension
-        ALU_DIV   = 4'b1010,    // M-extension
-        ALU_REM   = 4'b1011     // M-extension
+    // 5-bit encoding: 10 base RV32I ops + 8 M-extension ops = 18 (needs >4 bits)
+    typedef enum logic [4:0] {
+        ALU_ADD    = 5'd0,
+        ALU_SUB    = 5'd1,
+        ALU_AND    = 5'd2,
+        ALU_OR     = 5'd3,
+        ALU_XOR    = 5'd4,
+        ALU_SLL    = 5'd5,
+        ALU_SRL    = 5'd6,
+        ALU_SRA    = 5'd7,
+        ALU_SLT    = 5'd8,
+        ALU_SLTU   = 5'd9,
+        ALU_MUL    = 5'd10,   // M-extension: multiply low
+        ALU_MULH   = 5'd11,   // M-extension: multiply high signed x signed
+        ALU_MULHSU = 5'd12,   // M-extension: multiply high signed x unsigned
+        ALU_MULHU  = 5'd13,   // M-extension: multiply high unsigned x unsigned
+        ALU_DIV    = 5'd14,   // M-extension: signed divide
+        ALU_DIVU   = 5'd15,   // M-extension: unsigned divide
+        ALU_REM    = 5'd16,   // M-extension: signed remainder
+        ALU_REMU   = 5'd17    // M-extension: unsigned remainder
     } alu_op_e;
 
     // =====================================================================
@@ -155,31 +159,6 @@ package riscv_pkg;
         INST_U_TYPE = 3'd4,
         INST_J_TYPE = 3'd5
     } inst_type_e;
-
-    // =====================================================================
-    // Pipeline Control Signals (for future multi-cycle/pipelined versions)
-    // =====================================================================
-    typedef struct packed {
-        logic         stall;
-        logic         flush;
-        logic         bubble;
-    } pipeline_ctrl_s;
-
-    // =====================================================================
-    // Processor Status/Control Register (for debug/VIO)
-    // =====================================================================
-    typedef struct packed {
-        logic [15:0]  reserved;
-        logic [6:0]   current_opcode;
-        logic         branch_taken;
-        logic         mem_write;
-        logic         mem_read;
-        logic         reg_write;
-        logic         jump_op;
-        logic         branch_op;
-        logic         processor_active;
-        logic         error_flag;
-    } proc_status_s;
 
     // =====================================================================
     // Utility Functions

@@ -35,6 +35,24 @@ xsim.dir/
 *.wcfg
 *.vcd
 *.ghw
+*.fst
+
+# Open-source HDL tool artifacts (Icarus Verilog / Verilator / SymbiYosys)
+# The directed regression and lint flows (make iv-all / lint-verilator) and the
+# formal flow (sby) produce these. sby work dirs are kept under $HOME by
+# build/run_formal_all.sh; ignore local ones too if sby is run in-tree.
+*.vvp
+a.out
+obj_dir/
+*.lxt2
+verification/formal/
+verification/formal_core/
+verification/formal_cover/
+verification/formal_bmc/
+
+# NOTE: .github/ (CI workflow, dependabot.yml, pull_request_template.md) is
+# intentionally tracked. .idea/ holds private notes and stays ignored; .qoder/
+# lives under .idea/ and is covered by that entry (do not add it separately).
 
 # OS generated files
 .DS_Store

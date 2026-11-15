@@ -16,7 +16,7 @@ This guide covers signal probing strategies for debugging the RISC-V processor u
 | jump | 1 | control_unit | Jump instruction |
 | alu_src1 | 1 | control_unit | ALU operand A select |
 | alu_src | 2 | control_unit | ALU operand B select |
-| alu_op | 4 | control_unit | ALU operation |
+| alu_op | 5 | control_unit | ALU operation (RV32I + RV32M) |
 | reg_write_src | 2 | control_unit | Writeback source |
 
 ### Datapath Signals
@@ -75,10 +75,12 @@ This guide covers signal probing strategies for debugging the RISC-V processor u
 **Trigger**: Specific opcode value
 **Analysis**: Verify decode correctness, immediate generation
 
-### Strategy 6: Pipeline Behavior
-**Probes**: pc_current, instruction, branch_taken, jump
+### Strategy 6: Single-Cycle Sequencing
+**Probes**: pc_current, instruction, branch_taken, jump, is_div
 **Trigger**: Any PC change
-**Analysis**: Verify IPC = 1.0, no bubbles, correct sequencing
+**Analysis**: Verify PC advances by 4 each cycle for RV32I and RV32M multiply.
+During a divide/remainder (`is_div` high) the PC holds for ~32 cycles until the
+sequential divider asserts `done`, so IPC drops below 1.0 for those instructions.
 
 ## Probe Grouping
 

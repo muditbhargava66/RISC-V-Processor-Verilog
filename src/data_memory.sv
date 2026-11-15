@@ -1,6 +1,13 @@
+`timescale 1ns / 1ps
 // Data Memory Module
 // Parameterized data memory with byte, halfword, and word access
-// SystemVerilog implementation with synchronous reset
+// SystemVerilog implementation with synchronous write / asynchronous read
+//
+// Memory map: MEM_DEPTH = 2**ADDR_WIDTH words of XLEN bits each, byte-addressed
+// over [0, MEM_DEPTH*4). With the default ADDR_WIDTH=8 this is 256 words = 1 KB
+// (byte addresses 0x000..0x3FF). Addresses above this range are flagged via
+// addr_out_of_range so the core can raise trap; the access itself is suppressed
+// to prevent silent wrap-around aliasing into valid memory.
 
 module data_memory #(
     parameter int ADDR_WIDTH = 8,
@@ -13,7 +20,8 @@ module data_memory #(
     input  logic [XLEN-1:0]      address,
     input  logic [XLEN-1:0]      write_data,
     input  logic [2:0]           funct3,
-    output logic [XLEN-1:0]      read_data
+    output logic [XLEN-1:0]      read_data,
+    output logic                 addr_out_of_range
 );
 
     import riscv_pkg::*;
@@ -28,18 +36,30 @@ module data_memory #(
     assign word_address = address[ADDR_WIDTH+1:2];
     assign byte_offset  = address[1:0];
 
+    // Range check: any address bit above the byte-address space means the access
+    // is outside physical memory. ADDR_WIDTH+2 bits cover MEM_DEPTH*4 bytes.
+    logic addr_hi;
+    assign addr_hi           = |address[XLEN-1:ADDR_WIDTH+2];
+    assign addr_out_of_range = (mem_read || mem_write) && addr_hi;
+
     integer i;
 
-    // Write operation with synchronous reset
+    // Power-on / simulation initialization. The memory is NOT cleared on reset:
+    // resetting a 256-word array would force a flip-flop implementation (~8K FFs)
+    // and block RAM inference. Initial values map to RAM init contents instead.
+    initial begin
+        for (i = 0; i < MEM_DEPTH; i++) begin
+            memory[i] = '0;
+        end
+    end
+
+    // Write operation (synchronous). Reset does not clear memory contents.
+    // Out-of-range writes are suppressed (flagged by addr_out_of_range).
     always_ff @(posedge clk) begin
-        if (reset) begin
-            for (i = 0; i < MEM_DEPTH; i++) begin
-                memory[i] <= '0;
-            end
-        end else if (mem_write) begin
-            unique case (funct3)
+        if (mem_write && !addr_hi) begin
+            case (funct3)
                 FUNCT3_SB: begin // SB (Store Byte)
-                    unique case (byte_offset)
+                    case (byte_offset)
                         2'b00: memory[word_address][7:0]   <= write_data[7:0];
                         2'b01: memory[word_address][15:8]  <= write_data[7:0];
                         2'b10: memory[word_address][23:16] <= write_data[7:0];
@@ -80,13 +100,13 @@ module data_memory #(
         end
     end
 
-    // Read operation (combinational)
+    // Read operation (combinational). Out-of-range reads return zero.
     always_comb begin
         read_data = '0;
-        if (mem_read) begin
-            unique case (funct3)
+        if (mem_read && !addr_hi) begin
+            case (funct3)
                 FUNCT3_LB: begin // LB (Load Byte)
-                    unique case (byte_offset)
+                    case (byte_offset)
                         2'b00: read_data = {{(XLEN-8){memory[word_address][7]}},  memory[word_address][7:0]};
                         2'b01: read_data = {{(XLEN-8){memory[word_address][15]}}, memory[word_address][15:8]};
                         2'b10: read_data = {{(XLEN-8){memory[word_address][23]}}, memory[word_address][23:16]};
@@ -120,7 +140,7 @@ module data_memory #(
                 end
 
                 FUNCT3_LBU: begin // LBU (Load Byte Unsigned)
-                    unique case (byte_offset)
+                    case (byte_offset)
                         2'b00: read_data = {{(XLEN-8){1'b0}}, memory[word_address][7:0]};
                         2'b01: read_data = {{(XLEN-8){1'b0}}, memory[word_address][15:8]};
                         2'b10: read_data = {{(XLEN-8){1'b0}}, memory[word_address][23:16]};

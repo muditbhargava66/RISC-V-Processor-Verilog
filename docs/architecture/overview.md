@@ -106,11 +106,17 @@
 
 ## Key Architectural Decisions
 
-### Single-Cycle Implementation
-- **One instruction per cycle** (ideal IPC = 1.0)
+### Single-Cycle Implementation (multi-cycle divide)
+- **One instruction per cycle** for all RV32I ops and RV32M multiply (ideal IPC = 1.0)
+- **Exception — RV32M divide/remainder**: `DIV`/`DIVU`/`REM`/`REMU` use a
+  multi-cycle sequential restoring divider ([Divider](../modules/divider.md)).
+  The core stalls (holds PC) for ~32 iterations; corner cases (divide-by-zero,
+  signed overflow) resolve in one cycle. This removes the combinational divider
+  from the critical path.
 - **No pipeline hazards** - simpler control logic
 - **Longer clock period** limited by critical path
 - **Target**: 50 MHz on Artix-7 (20ns period)
+- **RV32 only**: `XLEN` must be 32 (enforced by an elaboration-time guard)
 
 ### Harvard Architecture
 - **Separate I-MEM and D-MEM** - simultaneous access
@@ -132,7 +138,8 @@
 | Logical | AND, OR, XOR |
 | Shift | SLL, SRL, SRA |
 | Comparison | SLT, SLTU |
-| M-Extension | MUL, MULH, DIV, REM |
+| M-Extension (multiply) | MUL, MULH, MULHSU, MULHU |
+| M-Extension (divide, multi-cycle) | DIV, DIVU, REM, REMU |
 
 ### Branch/Jump Handling
 - **Branches**: ALU-based comparison (SUB/SLT/SLTU)
@@ -182,8 +189,9 @@
 | `jump` | 1 | JAL/JALR instruction |
 | `alu_src1` | 1 | Operand A: 0=rs1, 1=PC (for AUIPC) |
 | `alu_src` | 2 | Operand B: 00=rs2, 01=imm, 10=PC, 11=zero |
-| `alu_op` | 4 | ALU operation select |
+| `alu_op` | 5 | ALU operation select (18 ops: 10 base + 8 M) |
 | `reg_write_src` | 2 | Writeback: 00=ALU, 01=MEM, 10=PC+4, 11=IMM |
+| `is_div` | 1 | RV32M divide/remainder: stall the core for the sequential divider |
 
 ### Opcode Decode Map
 
@@ -205,8 +213,15 @@
 |--------|--------|-------------|--------|
 | 0000001 | 000 | MUL | ALU_MUL |
 | 0000001 | 001 | MULH | ALU_MULH |
-| 0000001 | 100 | DIV | ALU_DIV |
-| 0000001 | 110 | REM | ALU_REM |
+| 0000001 | 010 | MULHSU | ALU_MULHSU |
+| 0000001 | 011 | MULHU | ALU_MULHU |
+| 0000001 | 100 | DIV | ALU_DIV (sequential divider) |
+| 0000001 | 101 | DIVU | ALU_DIVU (sequential divider) |
+| 0000001 | 110 | REM | ALU_REM (sequential divider) |
+| 0000001 | 111 | REMU | ALU_REMU (sequential divider) |
+
+`is_div` is asserted for funct3 ≥ 100 (the divide/remainder ops); the multiply
+ops (funct3 000..011) remain single-cycle in the ALU.
 
 ### Shift Amount Encoding (I-type)
 
@@ -230,11 +245,13 @@
 ## Extensions
 
 ### M-Extension (ENABLE_M=1)
-- **MUL**: 32×32 → 32-bit (low)
-- **MULH**: 32×32 → 32-bit (high, signed)
-- **DIV**: Signed division
-- **REM**: Signed remainder
-- **DSP Usage**: 2 DSP48E1 blocks on Artix-7
+- **MUL / MULH / MULHSU / MULHU**: 32×32 multiply (low / high signed / high signed-unsigned / high unsigned)
+- **DIV / DIVU**: signed / unsigned division
+- **REM / REMU**: signed / unsigned remainder
+- **Corner cases**: divide-by-zero and −2³¹/−1 overflow handled per the RISC-V spec
+- **Resource usage**: 0 DSP48 blocks — the multiplier maps to LUTs/CARRY4. Divide/
+  remainder use a sequential restoring divider ([Divider](../modules/divider.md)),
+  not combinational logic, so they no longer set the core critical path.
 
 ### C-Extension (ENABLE_C=0, Future)
 - 16-bit compressed instructions
@@ -290,32 +307,35 @@
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `XLEN` | 32 | Register width (32/64) |
+| `XLEN` | 32 | Register width — **RV32 only** (enforced at elaboration) |
 | `ENABLE_M` | 1 | Enable M-extension |
-| `ENABLE_C` | 0 | Enable C-extension |
+| `ENABLE_C` | 0 | Enable C-extension (reserved; not implemented) |
 | `IMEM_ADDR_WIDTH` | 8 | I-MEM address bits |
 | `DMEM_ADDR_WIDTH` | 8 | D-MEM address bits |
-| `ILA_DEPTH` | 1024 | ILA capture depth |
 
-## Timing Characteristics
+## Timing Characteristics (verified, minimal target)
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Target Frequency | 50 MHz | Artix-7 -1 speed grade |
-| Critical Path | ~9.5 ns | ALU → D-MEM → Writeback |
-| Setup Slack | > 1 ns | With 20ns period |
-| Hold Slack | > 0 ns | Met |
-| Pipeline Stages | 1 | Single-cycle |
+| Target Frequency | 50 MHz | Artix-7 -1 speed grade (20 ns core period) |
+| WNS (setup) | +4.134 ns | All constraints met |
+| WHS (hold) | +0.081 ns | Met |
+| Worst core path | ~15.9 ns | Single-cycle datapath + divider iteration logic |
+| Pipeline Stages | 1 | Single-cycle (multi-cycle divide stalls the core) |
 
-## Resource Utilization (Estimated)
+## Resource Utilization (verified v1.2.0 post-route)
 
 | Resource | Minimal | JTAG Debug | Available (XC7A35T) |
 |----------|---------|------------|---------------------|
-| LUTs | ~4,100 | ~4,200 | 20,800 |
-| FFs | ~8,400 | ~8,500 | 41,600 |
-| DSPs | 2 | 2 | 90 |
-| BRAM | 0 | 0 | 50 |
-| I/O | 12 | 12 | 88 |
+| LUTs | 540 | 3,352 | 20,800 |
+| FFs | 227 | 5,146 | 41,600 |
+| DSPs | 0 | 0 | 90 |
+| BRAM | 0 | 12 | 50 |
+| I/O | 18 | 12 | 106 |
+
+The JTAG build adds the ILA capture memory (12 BRAM) and dbg_hub/ILA/VIO logic.
+Both builds use 0 DSP (the multiplier maps to LUTs/CARRY4; divide is a sequential
+LUT-based divider). See `build/reports/utilization_*_impl.rpt`.
 
 ## Design Variants
 
