@@ -13,7 +13,7 @@ vio_riscv_processor u_vio (
     .clk           (clk),
     .probe_in0     (pc_debug),           // [31:0] PC Status
     .probe_in1     (instruction_debug),  // [31:0] Instruction Status
-    .probe_in2     ({24'd0, instruction_debug[6:0], branch_taken_debug, 
+    .probe_in2     ({17'd0, instruction_debug[6:0], branch_taken_debug, 
                      mem_write_debug, mem_read_debug, reg_write_debug,
                      jump_op, branch_op, processor_active, error_flag}),
     .probe_out0    (),  // Control Register (reserved)
@@ -29,20 +29,19 @@ vio_riscv_processor u_vio (
 | `probe_in1` | 31:0 | Current Instruction |
 | `probe_in2` | 31:0 | Control Status Register |
 
-**Control Status Register Bit Map**:
+**Control Status Register Bit Map** (LSB-first, matches the wrapper concatenation):
 | Bit | Name | Description |
 |-----|------|-------------|
-| 31:24 | Reserved | |
-| 23:17 | Opcode | Current instruction opcode |
-| 16 | Branch Taken | Branch condition true |
-| 15 | Mem Write | Data memory write active |
-| 14 | Mem Read | Data memory read active |
-| 13 | Reg Write | Register file write active |
-| 12 | Jump Op | JAL/JALR instruction |
-| 11 | Branch Op | Branch instruction |
-| 10 | Processor Active | Non-zero instruction |
-| 9 | Error Flag | Illegal opcode detected |
-| 8:0 | Reserved | |
+| 31:15 | Reserved | Tied to 0 |
+| 14:8 | Opcode | Current instruction opcode |
+| 7 | Branch Taken | Branch condition true |
+| 6 | Mem Write | Data memory write active |
+| 5 | Mem Read | Data memory read active |
+| 4 | Reg Write | Register file write active |
+| 3 | Jump Op | JAL/JALR instruction |
+| 2 | Branch Op | Branch instruction |
+| 1 | Processor Active | Non-zero instruction |
+| 0 | Error Flag | Core `trap` (illegal instruction / misaligned / out-of-range) |
 
 ### Output Control (probe_out) - Reserved for Future
 

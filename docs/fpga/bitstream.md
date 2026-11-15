@@ -9,7 +9,7 @@ Bitstream generation creates the configuration file for programming the FPGA.
 ### Via Make
 ```bash
 make implement-minimal
-# Bitstream: build/vivado/riscv_processor_minimal/riscv_processor_minimal.bit
+# Bitstream: build/vivado/riscv_processor_minimal/riscv_processor_minimal.runs/impl_1/riscv_processor_minimal.bit
 ```
 
 ### Manual Steps
@@ -37,9 +37,6 @@ write_bitstream -force -startup_clk cclk riscv_processor_minimal.bit
 
 ### Recommended Options
 ```tcl
-write_bitstream -force -compress -crc enable theAI assistant to continue statements are not allowed in Tcl
-```
-```tcl
 write_bitstream -force -compress -crc enable riscv_processor_minimal.bit
 ```
 
@@ -58,7 +55,7 @@ write_bitstream -force -compress -crc enable riscv_processor_minimal.bit
 |-----------|-------|
 | Device | XC7A35T |
 | Package | CPG236 |
-| Bitstream Size | ~2.5 MB (compressed ~1.3 MB) |
+| Bitstream Size | ~2.1 MB uncompressed (verified: 2,192,131 bytes) |
 | Configuration Time | ~100 ms @ 50 MHz CCLK |
 
 ## Programming Methods
@@ -74,7 +71,7 @@ open_hw
 connect_hw_server
 open_hw_target
 current_hw_device [lindex [get_hw_devices] 0]
-set_property PROGRAM.FILE {build/vivado/riscv_processor_minimal/riscv_processor_minimal.bit} [current_hw_device]
+set_property PROGRAM.FILE {build/vivado/riscv_processor_minimal/riscv_processor_minimal.runs/impl_1/riscv_processor_minimal.bit} [current_hw_device]
 program_hw_devices [current_hw_device]
 close_hw
 EOF
@@ -84,7 +81,7 @@ EOF
 ```tcl
 # Generate MCS file
 write_cfgmem -force -format mcs -interface spix4 -size 16 \
-  -loadbit "up 0 build/vivado/riscv_processor_minimal/riscv_processor_minimal.bit" \
+  -loadbit "up 0 build/vivado/riscv_processor_minimal/riscv_processor_minimal.runs/impl_1/riscv_processor_minimal.bit" \
   riscv_processor_minimal.mcs
 
 # Program flash
@@ -101,7 +98,7 @@ program_hw_devices -cfgmem -force \
 ### 3. USB-JTAG Cable (Digilent)
 ```bash
 # Using djtgcfg (Digilent)
-djtgcfg prog -d Basys3 -i 0 -f build/vivado/riscv_processor_minimal/riscv_processor_minimal.bit
+djtgcfg prog -d Basys3 -i 0 -f build/vivado/riscv_processor_minimal/riscv_processor_minimal.runs/impl_1/riscv_processor_minimal.bit
 ```
 
 ## Bitstream Verification

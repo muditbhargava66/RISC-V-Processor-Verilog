@@ -20,7 +20,8 @@ module data_memory #(
     input  logic [XLEN-1:0]      address,
     input  logic [XLEN-1:0]      write_data,
     input  logic [2:0]           funct3,
-    output logic [XLEN-1:0]      read_data
+    output logic [XLEN-1:0]      read_data,
+    output logic                 addr_out_of_range
 );
 ```
 
@@ -30,6 +31,21 @@ module data_memory #(
 |-----------|---------|-------------|
 | `ADDR_WIDTH` | 8 | Address bits for word addressing (256 words = 1KB) |
 | `XLEN` | 32 | Data width |
+
+### Address Range Check
+
+The byte-address space is `[0, MEM_DEPTH*4)` = `0x000..0x3FF` for the default
+1 KB memory. Any address bit above `ADDR_WIDTH+2` means the access is outside
+physical memory:
+
+```systemverilog
+assign addr_hi           = |address[XLEN-1:ADDR_WIDTH+2];
+assign addr_out_of_range = (mem_read || mem_write) && addr_hi;
+```
+
+Out-of-range accesses are **suppressed** (writes ignored, reads return 0) to
+prevent silent wrap-around aliasing into valid memory, and `addr_out_of_range`
+is OR-ed into the core's `trap` output.
 
 ### Access Types
 
@@ -50,9 +66,9 @@ always_ff @(posedge clk) begin
             memory[i] <= '0;
         end
     end else if (mem_write) begin
-        unique case (funct3)
+        case (funct3)
             FUNCT3_SB: begin  // Store Byte
-                unique case (byte_offset)
+                case (byte_offset)
                     2'b00: memory[word_address][7:0]   <= write_data[7:0];
                     2'b01: memory[word_address][15:8]  <= write_data[7:0];
                     2'b10: memory[word_address][23:16] <= write_data[7:0];
@@ -87,9 +103,9 @@ end
 always_comb begin
     read_data = '0;
     if (mem_read) begin
-        unique case (funct3)
+        case (funct3)
             FUNCT3_LB: begin  // Load Byte (sign-extended)
-                unique case (byte_offset)
+                case (byte_offset)
                     2'b00: read_data = {{(XLEN-8){memory[word_address][7]}},  memory[word_address][7:0]};
                     2'b01: read_data = {{(XLEN-8){memory[word_address][15]}}, memory[word_address][15:8]};
                     2'b10: read_data = {{(XLEN-8){memory[word_address][23]}}, memory[word_address][23:16]};
@@ -113,7 +129,7 @@ always_comb begin
                     read_data = memory[word_address];
             end
             FUNCT3_LBU: begin  // Load Byte Unsigned
-                unique case (byte_offset)
+                case (byte_offset)
                     2'b00: read_data = {{(XLEN-8){1'b0}}, memory[word_address][7:0]};
                     2'b01: read_data = {{(XLEN-8){1'b0}}, memory[word_address][15:8]};
                     2'b10: read_data = {{(XLEN-8){1'b0}}, memory[word_address][23:16]};

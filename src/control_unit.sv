@@ -1,5 +1,6 @@
+`timescale 1ns / 1ps
 // Control Unit Module
-// Generates control signals for all RV32I instructions
+// Generates control signals for all RV32I instructions and the RV32M extension
 // SystemVerilog implementation with always_comb
 
 module control_unit #(
@@ -16,29 +17,19 @@ module control_unit #(
     output logic        jump,
     output logic        alu_src1,
     output logic [1:0]  alu_src,
-    output logic [3:0]  alu_op,
-    output logic [1:0]  reg_write_src
+    output logic [4:0]  alu_op,
+    output logic [1:0]  reg_write_src,
+    output logic        is_div        // RV32M divide/remainder: needs multi-cycle stall
 );
 
     import riscv_pkg::*;
 
-    // ALU operation codes
-    localparam logic [3:0] ALU_ADD  = 4'b0000;
-    localparam logic [3:0] ALU_SUB  = 4'b1000;
-    localparam logic [3:0] ALU_AND  = 4'b0111;
-    localparam logic [3:0] ALU_OR   = 4'b0110;
-    localparam logic [3:0] ALU_XOR  = 4'b0100;
-    localparam logic [3:0] ALU_SLL  = 4'b0001;
-    localparam logic [3:0] ALU_SRL  = 4'b0101;
-    localparam logic [3:0] ALU_SRA  = 4'b1101;
-    localparam logic [3:0] ALU_SLT  = 4'b0010;
-    localparam logic [3:0] ALU_SLTU = 4'b0011;
-
-    // M-extension ALU ops
-    localparam logic [3:0] ALU_MUL   = 4'b1110;
-    localparam logic [3:0] ALU_MULH  = 4'b1111;
-    localparam logic [3:0] ALU_DIV   = 4'b1010;
-    localparam logic [3:0] ALU_REM   = 4'b1011;
+    // Divide/remainder detection: R-type, M-extension funct7, funct3 >= 100
+    // (DIV=100, DIVU=101, REM=110, REMU=111 all have funct3[2]=1; the multiply
+    // ops 000..011 have funct3[2]=0). Gated by ENABLE_M so a disabled M extension
+    // never stalls (the top-level trap logic flags it as illegal instead).
+    assign is_div = (opcode == OPCODE_R_TYPE) && (funct7 == FUNCT7_MULDIV) &&
+                    funct3[2] && ENABLE_M;
 
     always_comb begin
         // Default values
@@ -52,13 +43,13 @@ module control_unit #(
         alu_op         = ALU_ADD;
         reg_write_src  = WRITE_SRC_ALU;
 
-        unique case (opcode)
+        case (opcode)
             OPCODE_R_TYPE: begin
                 reg_write      = 1'b1;
                 alu_src        = ALU_SRC_REG;
                 reg_write_src  = WRITE_SRC_ALU;
 
-                unique case ({funct7, funct3})
+                case ({funct7, funct3})
                     {FUNCT7_BASE,      FUNCT3_ADD_SUB}: alu_op = ALU_ADD;  // ADD
                     {FUNCT7_SUB_SRA,   FUNCT3_ADD_SUB}: alu_op = ALU_SUB;  // SUB
                     {FUNCT7_BASE,      FUNCT3_SLL}:     alu_op = ALU_SLL;  // SLL
@@ -70,11 +61,15 @@ module control_unit #(
                     {FUNCT7_BASE,      FUNCT3_OR}:      alu_op = ALU_OR;   // OR
                     {FUNCT7_BASE,      FUNCT3_AND}:     alu_op = ALU_AND;  // AND
 
-                    // M-extension
-                    {FUNCT7_MULDIV,    FUNCT3_ADD_SUB}: alu_op = (ENABLE_M) ? ALU_MUL   : ALU_ADD;  // MUL
-                    {FUNCT7_MULDIV,    FUNCT3_SLL}:     alu_op = (ENABLE_M) ? ALU_MULH  : ALU_ADD;  // MULH
-                    {FUNCT7_MULDIV,    FUNCT3_SLT}:     alu_op = (ENABLE_M) ? ALU_DIV   : ALU_ADD;  // DIV
-                    {FUNCT7_MULDIV,    FUNCT3_SLTU}:    alu_op = (ENABLE_M) ? ALU_REM   : ALU_ADD;  // REM
+                    // M-extension: funct3 per RV32M spec (000..111)
+                    {FUNCT7_MULDIV,    3'b000}: alu_op = ALU_MUL;    // MUL
+                    {FUNCT7_MULDIV,    3'b001}: alu_op = ALU_MULH;   // MULH
+                    {FUNCT7_MULDIV,    3'b010}: alu_op = ALU_MULHSU; // MULHSU
+                    {FUNCT7_MULDIV,    3'b011}: alu_op = ALU_MULHU;  // MULHU
+                    {FUNCT7_MULDIV,    3'b100}: alu_op = ALU_DIV;    // DIV
+                    {FUNCT7_MULDIV,    3'b101}: alu_op = ALU_DIVU;   // DIVU
+                    {FUNCT7_MULDIV,    3'b110}: alu_op = ALU_REM;    // REM
+                    {FUNCT7_MULDIV,    3'b111}: alu_op = ALU_REMU;   // REMU
 
                     default: alu_op = ALU_ADD;
                 endcase
@@ -85,7 +80,7 @@ module control_unit #(
                 alu_src        = ALU_SRC_IMM;
                 reg_write_src  = WRITE_SRC_ALU;
 
-                unique case (funct3)
+                case (funct3)
                     FUNCT3_ADD_SUB: alu_op = ALU_ADD;   // ADDI
                     FUNCT3_SLT:     alu_op = ALU_SLT;   // SLTI
                     FUNCT3_SLTU:    alu_op = ALU_SLTU;  // SLTIU
@@ -119,7 +114,7 @@ module control_unit #(
                 branch         = 1'b1;
                 alu_src        = ALU_SRC_REG;
 
-                unique case (funct3)
+                case (funct3)
                     FUNCT3_BEQ:  alu_op = ALU_SUB;  // BEQ
                     FUNCT3_BNE:  alu_op = ALU_SUB;  // BNE
                     FUNCT3_BLT:  alu_op = ALU_SLT;  // BLT
@@ -159,7 +154,7 @@ module control_unit #(
 
             OPCODE_SYSTEM: begin
                 // System instructions (ECALL, EBREAK, CSR) - minimal implementation
-                // For now, treat as NOP
+                // Treated as NOP; flagged by the top-level trap logic as unimplemented.
             end
 
             default: begin
@@ -168,13 +163,15 @@ module control_unit #(
         endcase
     end
 
-    // Synthesis-time assertion for debugging
+    // Optional simulation-only diagnostic (enable with +define+RISCV_DEBUG).
     // synthesis translate_off
+`ifdef RISCV_DEBUG
     always_comb begin
         if (!is_valid_base_opcode(opcode)) begin
             $warning("CTRL_UNIT: Unknown opcode: %07b", opcode);
         end
     end
+`endif
     // synthesis translate_on
 
 endmodule

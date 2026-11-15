@@ -6,6 +6,17 @@ param(
     [switch]$LogsOnly
 )
 
+# Anchor to the repository root (the parent of scripts/) so the recursive
+# cleanup can never operate on an unrelated working directory. Verify repo
+# markers before deleting anything.
+$RepoRoot = Split-Path -Parent $PSScriptRoot
+if (-not (Test-Path (Join-Path $RepoRoot "src/riscv_processor.sv")) -or
+    -not (Test-Path (Join-Path $RepoRoot "Makefile"))) {
+    Write-Host "ERROR: clean.ps1 must reside in <repo>/scripts/; repo markers not found at $RepoRoot." -ForegroundColor Red
+    exit 1
+}
+Set-Location $RepoRoot
+
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "RISC-V Processor Cleanup Script" -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan

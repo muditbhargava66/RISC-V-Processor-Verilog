@@ -18,6 +18,7 @@ namespace eval riscv_build {
         src/instruction_memory.sv
         src/data_memory.sv
         src/control_unit.sv
+        src/divider.sv
         src/riscv_processor.sv
     }
 
@@ -67,16 +68,25 @@ namespace eval riscv_build {
             top_module "register_file_tb"
             test_file "testbenches/register_file_tb.sv"
         }
+        immgen {
+            top_module "immediate_generator_tb"
+            test_file "testbenches/immediate_generator_tb.sv"
+        }
+        pc {
+            top_module "program_counter_tb"
+            test_file "testbenches/program_counter_tb.sv"
+        }
+        divider {
+            top_module "divider_tb"
+            test_file "testbenches/divider_tb.sv"
+        }
         compliance {
             top_module "compliance_tests"
             test_file "verification/compliance_tests.sv"
         }
         formal {
             top_module "formal_verification_tb"
-            test_files {
-                "verification/riscv_processor_sva.sv"
-                "verification/formal_verification_tb.sv"
-            }
+            test_file "verification/formal_verification_tb.sv"
         }
         benchmark {
             top_module "performance_benchmark"
@@ -305,6 +315,8 @@ namespace eval riscv_build {
         report_power -file [file join $build_reports "power_${target}_impl.rpt"]
         report_drc -file [file join $build_reports "drc_${target}_impl.rpt"]
         report_methodology -file [file join $build_reports "methodology_${target}_impl.rpt"]
+        report_cdc -file [file join $build_reports "cdc_${target}_impl.rpt"]
+        report_clock_interaction -file [file join $build_reports "clock_interaction_${target}_impl.rpt"]
     }
 
     # Create simulation project
@@ -336,5 +348,28 @@ namespace eval riscv_build {
             }
         }
         return 1
+    }
+
+    # Create the ILA and VIO debug IP for the jtag target. The IP module names
+    # match the black-box instances in riscv_processor_jtag_debug.sv so Vivado
+    # binds them during synthesis (13 x 32-bit ILA probes; 3 in / 2 out VIO).
+    proc create_debug_ip {ila_depth} {
+        puts "Creating ILA/VIO debug IP for jtag target..."
+        create_ip -name ila -vendor xilinx.com -library ip -module_name ila_riscv_processor
+        set ila_cfg [list CONFIG.C_NUM_OF_PROBES {13} CONFIG.C_DATA_DEPTH $ila_depth]
+        for {set i 0} {$i < 13} {incr i} {
+            lappend ila_cfg CONFIG.C_PROBE${i}_WIDTH {32}
+        }
+        set_property -dict $ila_cfg [get_ips ila_riscv_processor]
+
+        create_ip -name vio -vendor xilinx.com -library ip -module_name vio_riscv_processor
+        set_property -dict [list \
+            CONFIG.C_NUM_PROBE_IN {3} CONFIG.C_NUM_PROBE_OUT {2} \
+            CONFIG.C_PROBE_IN0_WIDTH {32} CONFIG.C_PROBE_IN1_WIDTH {32} \
+            CONFIG.C_PROBE_IN2_WIDTH {32} CONFIG.C_PROBE_OUT0_WIDTH {32} \
+            CONFIG.C_PROBE_OUT1_WIDTH {32} \
+        ] [get_ips vio_riscv_processor]
+
+        generate_target {synthesis simulation} [get_ips ila_riscv_processor vio_riscv_processor]
     }
 }

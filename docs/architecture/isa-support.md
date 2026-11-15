@@ -4,17 +4,18 @@
 
 | Category | Instructions | Count | Status |
 |----------|--------------|-------|--------|
-| R-type | ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND | 10 | ✅ |
-| I-type ALU | ADDI, SLTI, SLTIU, XORI, ORI, ANDI | 6 | ✅ |
-| I-type Shift | SLLI, SRLI, SRAI | 3 | ✅ |
-| Loads | LB, LH, LW, LBU, LHU | 5 | ✅ |
-| Stores | SB, SH, SW | 3 | ✅ |
-| Branches | BEQ, BNE, BLT, BGE, BLTU, BGEU | 6 | ✅ |
-| Jumps | JAL, JALR | 2 | ✅ |
-| Upper Imm | LUI, AUIPC | 2 | ✅ |
-| System | ECALL, EBREAK | 2 | ⚠️ Minimal |
+| R-type | ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND | 10 | Yes |
+| I-type ALU | ADDI, SLTI, SLTIU, XORI, ORI, ANDI | 6 | Yes |
+| I-type Shift | SLLI, SRLI, SRAI | 3 | Yes |
+| Loads | LB, LH, LW, LBU, LHU | 5 | Yes |
+| Stores | SB, SH, SW | 3 | Yes |
+| Branches | BEQ, BNE, BLT, BGE, BLTU, BGEU | 6 | Yes |
+| Jumps | JAL, JALR | 2 | Yes |
+| Upper Imm | LUI, AUIPC | 2 | Yes |
+| System | ECALL, EBREAK | 2 | Minimal |
 
-**Total: 37/39 base RV32I instructions** (ECALL/EBREAK minimal)
+**Base RV32I instruction categories are decoded.** SYSTEM (ECALL/EBREAK/CSR) is
+unimplemented and raises the core `trap` output; there are no CSRs.
 
 ## Opcode Map
 
@@ -137,12 +138,21 @@
 | REM | 0110011 | 110 | 0000001 | Signed remainder |
 | REMU | 0110011 | 111 | 0000001 | Unsigned remainder |
 
-## C-Extension (ENABLE_C=1, Planned)
+Multiply (MUL/MULH/MULHSU/MULHU) is single-cycle in the ALU. Divide/remainder
+(DIV/DIVU/REM/REMU) use a multi-cycle sequential restoring divider
+([Divider](../modules/divider.md)) that stalls the core ~32 cycles; divide-by-zero
+and signed-overflow corner cases resolve in one cycle. All spec corner cases are
+implemented (DIV/0→−1, DIVU/0→max unsigned, REM/REMU/0→dividend, −2³¹/−1 overflow).
+
+## C-Extension (RV32C subset, Planned — not implemented)
+
+`ENABLE_C` is currently a reserved parameter; no compressed decode exists yet.
+The table lists the RV32C subset only (RV64C-only instructions such as C.ADDIW,
+C.LD and C.SD are excluded).
 
 | Instruction | Format | Description |
 |-------------|--------|-------------|
 | C.ADDI | CI | Add immediate |
-| C.ADDIW | CI | Add immediate word |
 | C.LI | CI | Load immediate |
 | C.LUI | CI | Load upper immediate |
 | C.ADDI16SP | CI | Add to SP |
@@ -161,37 +171,37 @@
 | C.BEQZ | CB | Branch if zero |
 | C.BNEZ | CB | Branch if not zero |
 | C.LW | CL | Load word |
-| C.LD | CL | Load doubleword |
 | C.SW | CS | Store word |
-| C.SD | CS | Store doubleword |
 
 ## Unsupported / Future
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| F/D Extensions | ❌ | Floating point |
-| A Extension | ❌ | Atomic operations |
-| Zicsr | ⚠️ | Partial (CSR read only) |
-| Zifencei | ❌ | Instruction fence |
-| Zihpm | ❌ | Hardware perf counters |
-| Sv32/Sv39/Sv48 | ❌ | Virtual memory |
-| Debug Spec | ⚠️ | JTAG ILA only |
+| F/D Extensions | No | Floating point |
+| A Extension | No | Atomic operations |
+| Zicsr | No | No CSRs; SYSTEM raises `trap` |
+| Zifencei | No | Instruction fence |
+| Zihpm | No | Hardware perf counters |
+| Sv32/Sv39/Sv48 | No | Virtual memory |
+| Debug Spec | Partial | JTAG ILA only |
 
 ## Verification Status
 
 | Instruction | System Test | Unit Test | Formal |
 |-------------|-------------|-----------|--------|
-| All R-type | ✅ | ✅ | ✅ |
-| All I-type ALU | ✅ | ✅ | ✅ |
-| All Shifts | ✅ | ✅ | ✅ |
-| All Loads | ✅ | ✅ | ✅ |
-| All Stores | ✅ | ✅ | ✅ |
-| All Branches | ✅ | ✅ | ✅ |
-| JAL/JALR | ✅ | ✅ | ✅ |
-| LUI/AUIPC | ✅ | ✅ | ✅ |
-| M-Extension | ⚠️ Synth only | ⚠️ Synth only | ❌ |
+| All R-type | Yes | Yes | Yes |
+| All I-type ALU | Yes | Yes | Yes |
+| All Shifts | Yes | Yes | Yes |
+| All Loads | Yes | Yes | Yes |
+| All Stores | Yes | Yes | Yes |
+| All Branches | Yes | Yes | Yes |
+| JAL/JALR | Yes | Yes | Yes |
+| LUI/AUIPC | Yes | Yes | Yes |
+| M-Extension (MUL/DIV) | Yes | Yes | No |
 
-> **Note**: M-extension instructions synthesize correctly but lack dedicated unit tests and formal properties.
+> **Note**: RV32M multiply is covered by `alu_tb` and `control_unit_tb`; divide/remainder
+> by the dedicated `divider_tb` (884 checks) and the compliance harness. No dedicated
+> formal properties for the M extension yet.
 
 ## Reference
 

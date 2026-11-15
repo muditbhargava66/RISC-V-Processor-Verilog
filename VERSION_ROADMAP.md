@@ -1,6 +1,6 @@
 # RISC-V Processor Version Roadmap
 
-## Current Status: v1.1.0 (Integration Work)
+## Current Status: v1.2.0 (Correctness & Verification Honesty)
 
 - Complete RV32I single-cycle implementation
 - Successfully synthesized in Vivado (Quartus SDC exists but not fully validated)
@@ -42,7 +42,7 @@
   - Removed misleading "mark_debug only" approach
 
 - **Verification Enhancements**
-  - 15 inline SVA assertions + 12 cover properties in core processor
+  - 14 inline SVA assertions + 15 cover properties (simulation-only) in core processor
   - SymbiYosys configs: prove, BMC, cover, core-only
   - Compliance smoke tests with accurate reporting (skip tracking)
   - Benchmark with NOP-streak program-end detection
@@ -58,14 +58,26 @@
 - Critical bug fix: LUI instruction now loads upper immediate correctly
 - Removed redundant branch_unit, integrated into ALU-based comparisons
 - Critical path ~9.5ns (target 50MHz with 20ns period)
-- Clean synthesis: 0 errors, 0 critical warnings, 59 warnings (expected)
+- Synthesis/implementation reports are not committed; resource and warning counts are unverified estimates
 - Resource utilization: ~4,100 LUTs, ~8,400 FFs, 2 DSPs
 
 ---
 
-## Version 1.2.0 - Performance Optimization (PLANNED)
+## Version 1.2.0 - Correctness & Verification Honesty - COMPLETED
 
-**Target Release:** Q1 2026  
+**Released:** November 2026  
+**Focus:** Fix critical RTL defects, honest verification, FPGA clock/reset integrity
+
+See `CHANGELOG.md` for the full v1.2.0 change list: M-extension decode fix and
+unsigned ops, trap signaling, formal-infrastructure repair, failure exit codes,
+directed compliance harness, clock divider + reset synchronizer, JTAG/Quartus
+fixes, documentation corrections, and a free CI workflow.
+
+---
+
+## Version 1.3.0 - Performance Optimization (PLANNED)
+
+**Target Release:** TBD  
 **Focus:** Pipeline architecture and performance improvements
 
 ### Planned Features:
@@ -99,16 +111,16 @@
 
 ## Version 2.0.0 - ISA Extensions and Advanced Features (PLANNED)
 
-**Target Release:** Q2 2026  
+**Target Release:** TBD  
 **Focus:** Extended instruction set and advanced capabilities
 
 ### Planned Features:
 
-- **RV32M Extension (Multiply/Divide)**
-  - Hardware multiplier and divider units (partially done in ALU)
-  - 32-bit multiplication and division operations
-  - Optimized for FPGA DSP blocks
-  - Full compliance with RISC-V M extension
+- **RV32M Extension (Multiply/Divide)** — COMPLETE (v1.2.0)
+  - Hardware multiplier (ALU, single-cycle) + sequential restoring divider
+  - All 8 ops: MUL/MULH/MULHSU/MULHU/DIV/DIVU/REM/REMU with spec corner cases
+  - 0 DSP blocks (LUT/CARRY4 multiplier); divide is multi-cycle with core stall
+  - Verified by `divider_tb` (884 checks) and compliance Phase C
 
 - **RV32F Extension (Single-Precision Floating-Point)**
   - IEEE 754 compliant floating-point unit
@@ -140,7 +152,7 @@
 
 ## Version 2.1.0 - System Integration (PLANNED)
 
-**Target Release:** Q3 2026  
+**Target Release:** TBD  
 **Focus:** System-on-Chip integration and peripherals
 
 ### Planned Features:
@@ -175,7 +187,7 @@
 
 ## Version 3.0.0 - Multi-Core and Advanced Architecture (PLANNED)
 
-**Target Release:** Q4 2026  
+**Target Release:** TBD  
 **Focus:** Multi-core support and advanced features
 
 ### Planned Features:
@@ -288,4 +300,4 @@ This roadmap provides a clear path for evolving the RISC-V processor from a prod
 
 The focus on incremental development, comprehensive testing, and community engagement ensures that each release provides real value while maintaining the high quality standards established in v1.0.0.
 
-**Current Status: v1.1.0 is the stable baseline. All future versions are planned work.**
+**Current Status: v1.2.0 is the stable baseline. All future versions are planned work.**

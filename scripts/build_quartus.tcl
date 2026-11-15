@@ -5,7 +5,7 @@
 set project_name "riscv_processor_quartus"
 set project_dir "./build/quartus"
 set device_family "Cyclone V"
-set device_part "5CGXFC7C7F23C8"
+set device_part "5CSEBA6U23I7"
 
 puts "========================================="
 puts "RISC-V Processor Quartus Build"
@@ -48,17 +48,19 @@ puts $qsf_file "set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85"
 puts $qsf_file "set_global_assignment -name POWER_PRESET_COOLING_SOLUTION \"23 MM HEAT SINK WITH 200 LFPM AIRFLOW\""
 puts $qsf_file "set_global_assignment -name POWER_BOARD_THERMAL_MODEL \"NONE (CONSERVATIVE)\""
 
-# Add source files
+# Add source files (SystemVerilog; package must come first)
 puts $qsf_file ""
 puts $qsf_file "# Source files"
-puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/riscv_processor.v"
-puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/program_counter.v"
-puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/instruction_memory.v"
-puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/register_file.v"
-puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/Control_unit.v"
-puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/immediate_generator.v"
-puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/alu.v"
-puts $qsf_file "set_global_assignment -name VERILOG_FILE ../../src/data_memory.v"
+puts $qsf_file "set_global_assignment -name SYSTEMVERILOG_FILE ../../src/riscv_pkg.sv"
+puts $qsf_file "set_global_assignment -name SYSTEMVERILOG_FILE ../../src/alu.sv"
+puts $qsf_file "set_global_assignment -name SYSTEMVERILOG_FILE ../../src/control_unit.sv"
+puts $qsf_file "set_global_assignment -name SYSTEMVERILOG_FILE ../../src/divider.sv"
+puts $qsf_file "set_global_assignment -name SYSTEMVERILOG_FILE ../../src/data_memory.sv"
+puts $qsf_file "set_global_assignment -name SYSTEMVERILOG_FILE ../../src/immediate_generator.sv"
+puts $qsf_file "set_global_assignment -name SYSTEMVERILOG_FILE ../../src/instruction_memory.sv"
+puts $qsf_file "set_global_assignment -name SYSTEMVERILOG_FILE ../../src/program_counter.sv"
+puts $qsf_file "set_global_assignment -name SYSTEMVERILOG_FILE ../../src/register_file.sv"
+puts $qsf_file "set_global_assignment -name SYSTEMVERILOG_FILE ../../src/riscv_processor.sv"
 puts $qsf_file "set_global_assignment -name HEX_FILE ../../instruction_memory.hex"
 
 # Add constraint files
@@ -74,9 +76,12 @@ puts $qsf_file "set_location_assignment PIN_Y16 -to reset"
 puts $qsf_file "set_io_standard \"3.3-V LVTTL\" -to clk"
 puts $qsf_file "set_io_standard \"3.3-V LVTTL\" -to reset"
 
-# Debug pin assignments (LEDs)
+# Debug pin assignments (LEDs) - one distinct pin per bit.
+# NOTE: illustrative DE10-Nano pins; verify against the board schematic before use.
+set led_pins {PIN_W15 PIN_AW19 PIN_AW20 PIN_AW21 PIN_AV21 PIN_AV20 PIN_AU20 PIN_AU19}
 for {set i 0} {$i < 8} {incr i} {
-    puts $qsf_file "set_location_assignment PIN_W15 -to pc_debug\[$i\]"
+    set pin [lindex $led_pins $i]
+    puts $qsf_file "set_location_assignment $pin -to pc_debug\[$i\]"
     puts $qsf_file "set_io_standard \"3.3-V LVTTL\" -to pc_debug\[$i\]"
 }
 

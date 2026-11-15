@@ -5,6 +5,175 @@ All notable changes to the RISC-V Processor project will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-11-15
+
+Correctness, verification-honesty, and FPGA-implementation release. This release
+fixes the critical defects found in the v1.1.0 audit and removes unsupported
+claims. **Correction of the v1.1.0 record:** the v1.1.0 changelog entries "proper
+M-extension decode" and "All critical properties verified (BMC depth 50)" were
+inaccurate — the M-extension decode was wrong (a spec `DIV` executed as `ADD`)
+and no formal proof was runnable from that tree. Both are addressed below.
+
+### Fixed (RTL correctness)
+- **M-extension decode (critical):** `control_unit.sv` now maps `funct7=MULDIV`
+  with `funct3` 000..111 to MUL/MULH/MULHSU/MULHU/DIV/DIVU/REM/REMU per the RISC-V
+  spec. Previously DIV/DIVU/REM/REMU fell through to `ALU_ADD`.
+- **ALU (critical):** `alu.sv` implements all eight RV32M operations with the spec
+  corner cases: divide-by-zero (DIV→-1, DIVU→max unsigned, REM/REMU→dividend) and
+  signed overflow (−2³¹/−1 → quotient −2³¹, remainder 0). MULHSU zero-extends the
+  unsigned operand. `alu_op` widened to 5 bits; shadowing localparams removed in
+  favor of the `riscv_pkg` enums.
+- **Trap signaling:** `riscv_processor.sv` adds a `trap` output for illegal
+  instructions (unknown opcode, unsupported funct7, M-disabled MULDIV, SYSTEM)
+  and misaligned halfword/word accesses. Simulation and synthesis now agree.
+- **Data memory:** removed the synchronous reset loop that forced 8,192 flip-flops;
+  memory is initialized once via `initial`/`$readmemh`, enabling BRAM-friendly
+  inference.
+
+### Fixed (FPGA implementation)
+- **Clock (critical):** Basys3's 100 MHz oscillator is now divided to the 50 MHz
+  core clock with a toggle flop buffered by a 7-series `BUFG` (the earlier
+  `BUFGCE_DIV` choice is UltraScale-only and failed Artix-7 implementation as a
+  black box). XDCs use `create_clock -period 10.000` plus a
+  `create_generated_clock` on the `BUFG` output; SDC unified to 50 MHz.
+- **Reset:** wrappers add a 2-FF reset synchronizer (async assert, sync deassert).
+- **JTAG debug:** `build_vivado.tcl` now generates matching ILA (13×32-bit probes)
+  and VIO (3 in / 2 out, 32-bit) IP; fixed the 39→32-bit `probe_in2` concatenation;
+  `error_flag` now drives the core `trap`; removed stale `dbg_hub` constraints.
+  Removed the wrapper's colliding black-box ILA/VIO module definitions and the
+  invalid `C_DATA_DEPTH` override (the generated IP stub exposes no such
+  parameter — Synth 8-7136/8-9873); Vivado binds the instantiations to the
+  generated IP by name.
+- **Quartus (critical):** `build_quartus.tcl` rewritten for the `.sv` file list
+  (package first), a consistent device, and distinct LED pin assignments.
+
+### Fixed (verification honesty)
+- **Failure exit codes:** all self-checking testbenches `$fatal(1, ...)` on any
+  failed check; `run_simulation.tcl` scans the xsim log for failure markers,
+  requires a non-empty log and a `PASSED` banner, and exits non-zero on failure;
+  `quick_lint_check.tcl` exits non-zero on lint failure.
+- **Compliance suite:** replaced opportunistic sampling with a directed,
+  cycle-accurate harness (`compliance_tests.sv`, 41 checks across R/I ALU,
+  LUI/AUIPC, loads/stores, RV32M, and control flow).
+- **Formal infrastructure:** added `verification/riscv_processor_sva.sv`
+  (formal wrapper) and `verification/formal_verification_tb.sv` (xsim assertion
+  test). Rewrote all four `.sby` configs to use the **yosys-slang** frontend
+  (`read_slang`, required for the SV package/enums), `-D IVERILOG` to exclude
+  sim-only SVA, `prep -flatten`, and the hex image. The wrapper assumes a
+  first-cycle reset pulse so PC alignment is checked from the reset state. Prove
+  configs use `abc pdr` (IC3) with `wait off`; the BMC config uses `smtbmc
+  bitwuzla` (depth 12, covering the canonical program). With OSS CAD Suite
+  installed, all four configs run and PASS: prove and core-prove are unbounded
+  (<1 s), cover reaches all 3 cover points, and BMC passes to depth 12.
+- **New unit testbenches:** `immediate_generator_tb.sv` (8 checks) and
+  `program_counter_tb.sv` (later extended to 8 with hold/stall tests). Control TB
+  at 45 vectors; ALU TB at 21 vectors after the divide/remainder vectors moved to
+  the new `divider_tb.sv` (884 checks) in the remediation pass.
+
+### Fixed (toolchain compatibility)
+- **Icarus Verilog:** core SVA guarded with `` `ifndef IVERILOG ``;
+  `instruction_memory.sv` uses an untyped `parameter INIT_FILE` (Icarus 11
+  compatibility). Added Makefile open-source targets (`iv-all`, `lint-verilator`)
+  with POSIX-safe OS detection.
+
+### Fixed (documentation & hygiene)
+- Corrected false/contradictory claims in README, CHANGELOG, VERSION_ROADMAP,
+  `docs/modules/alu.md`, and `docs/architecture/isa-support.md`; marked
+  unverified implementation numbers as historical estimates.
+- Repaired 16 dead links in `docs/index.md`; fixed mis-decoded program comments in
+  the verification guide.
+- Added a free GitHub Actions CI workflow (`.github/workflows/ci.yml`: Icarus
+  Verilog regression + Verilator lint on Ubuntu 24.04).
+- `clean.ps1` now anchors to the repository root and verifies repo markers before
+  deleting. Removed orphaned legacy scripts `run_minimal_impl*.tcl`.
+
+### Audit remediation pass (M1 / M3 / M10 / M12 / L2 / L3 / L5 / L6 / L7)
+- **L7 — multi-cycle divider (architectural):** added `src/divider.sv`, a radix-2
+  restoring divider (32 iterations) for `DIV`/`DIVU`/`REM`/`REMU`. The core now
+  stalls (holds PC via a new `program_counter.hold` input) while `busy` is high
+  and writes the result on the `done` cycle; `control_unit` emits `is_div`, and
+  register write-back is gated until the result is valid. Divide-by-zero and
+  signed-overflow corner cases resolve combinationally in one cycle. The
+  combinational divide logic was removed from `alu.sv` (those codes now yield 0;
+  the core muxes the divider result), removing the unrolled combinational divider
+  from the datapath. New `testbenches/divider_tb.sv` (884 checks: corners,
+  directed vectors, 200 randomized vs an independent oracle, handshake/latency,
+  reset). The former ALU divide vectors moved here; `compliance_tests` Phase C
+  cycle budget raised to cover the stall.
+- **M1 — RV32-only:** `riscv_processor` adds an elaboration-time guard (`XLEN`
+  must be 32); the U-type immediate in `immediate_generator.sv` is now formed as
+  `{instruction[31:12], 12'b0}` sign-extended to `XLEN` (correct field placement).
+  Docs corrected to RV32-only (no RV64 claim).
+- **M3 — address range check:** `data_memory.sv` exposes `addr_out_of_range`;
+  out-of-range loads/stores are suppressed (no wrap-around aliasing) and the core
+  ORs the flag into `trap`. Memory map documented (1 KB I-MEM/D-MEM).
+- **M10 — case hygiene:** replaced `unique case` with plain `case` (keeping
+  `default`) across the RTL; illegal encodings are handled by the trap logic, so
+  this removes simulation `unique case` violation spam without masking errors.
+- **M12 — orphan test removed:** deleted `testbenches/lui_test.v` (an opportunistic
+  sampler dependent on the hex image, redundant with the directed LUI/AUIPC checks
+  in `compliance_tests` Phase B, and not wired into any build target).
+- **L2 — dead code removed:** dropped unused `ENABLE_F`, `ENABLE_D`,
+  `pipeline_ctrl_s`, and `proc_status_s` from `riscv_pkg.sv` (verified zero
+  references). `ENABLE_C` retained as a documented reserved toggle.
+- **L3 — warning spam gated:** the `$warning` diagnostics in `register_file`,
+  `alu`, `control_unit`, and `immediate_generator` are now behind
+  `` `ifdef RISCV_DEBUG `` so default builds are quiet (writing x0 is legal RISC-V).
+- **L5 — timescale:** added `` `timescale 1ns/1ps `` to all RTL modules/package.
+- **L6 — EOF newlines:** added trailing newlines to all `src/*.sv`; removed
+  `-Wno-EOFNEWLINE` from the Verilator lint target (lint is clean without it).
+- Registered `divider.sv` in the Makefile (`iv-divider`/`test-divider`), all four
+  `.sby` configs, and the Vivado/Quartus source lists; added a `divider` xsim test.
+
+### Added (full-core characterization)
+- **`make full-core` flow:** `scripts/run_full_core.tcl` +
+  `constraints/riscv_processor_core.xdc` synthesize and implement the complete
+  `riscv_processor` core (all 241 debug I/O retained) on `xc7a35tfgg484-1` — the
+  same xc7a35t die and -1 speed grade as Basys3, in a 250-I/O package so every port
+  fits (the cpg236 Basys3 package has only 106 user I/O). Implementation runs to
+  `route_design` (no bitstream) and writes 18 comprehensive reports to
+  `build/reports/`. Verified routed results: 596 LUTs (468 logic + 128 distributed
+  RAM), 224 FF, 0 DSP / 0 BRAM, WNS +5.462 ns / WHS +0.241 ns (all constraints met),
+  95 mW. The full core retains 56 more logic LUTs than the trimmed minimal wrapper.
+  Documented in `docs/fpga/full-core-characterization.md`.
+- **Docs hygiene:** replaced emoji status markers in
+  `docs/architecture/isa-support.md` with plain text (Yes/No/Minimal/Partial) and
+  corrected the stale M-extension verification row (multiply/divide now have unit
+  and system coverage via `alu_tb`, `control_unit_tb`, `divider_tb`, compliance).
+
+### Verification (actually run for this release)
+- Windows Icarus Verilog 12.0: system 6/6, ALU 21/21, control 45/45, memory 18/18,
+  regfile 37/37, immgen 8/8, pc 8/8, divider 884/884, compliance 41/41 — all exit 0.
+- Verilator `--lint-only -Wall --assert` (core): clean, exit 0.
+- Vivado 2023.2 xsim: system test 6/6 PASS.
+- Vivado 2023.2 synthesis + implementation + bitstream (`minimal`,
+  xc7a35tcpg236-1): synth/place/route/write_bitstream all Complete; 540 LUTs
+  (2.60%), 227 FFs (0.55%), 0 BRAM, 0 DSP, 2 BUFG. Post-route timing met at
+  50 MHz (WNS +4.134 ns, WHS +0.081 ns, TNS/THS 0); DRC and methodology 0
+  violations; `report_cdc` Safe=1 / Unsafe=0 (async reset synchronizer); clock
+  interaction Clean; vector-less power estimate 88 mW. The earlier `BUFGCE_DIV`
+  divider is UltraScale-only and failed Artix-7 implementation (black-box DRC
+  INBB-3); replaced with a toggle flop + BUFG.
+- Vivado 2023.2 JTAG target (`riscv_processor_jtag_debug`): synth/place/route/
+  write_bitstream all Complete; 3,352 LUTs (16.12%), 5,146 FFs (12.37%), 12 BRAM
+  (ILA capture), 0 DSP, 3 BUFG. Timing met at 50 MHz (WNS +3.509 ns, WHS +0.027 ns);
+  `report_cdc` all crossings Safe (dbg_hub TCK crossings handled by Max Delay
+  Datapath Only). DRC and methodology each report 4 warnings, all inside the
+  Vivado `dbg_hub`/xsdbm debug IP (PDCN-1569, RTSTAT-10, LUTAR-1) — 0 errors or
+  critical warnings in the user design. Note: on Windows the `dbg_hub` insertion
+  requires a Vivado temp path ≤146 chars (Chipscope 16-302); build from a short
+  path (e.g. `subst R: <repo>`).
+- Formal assertion TB: architectural checks pass under Icarus Verilog.
+- SymbiYosys (OSS CAD Suite 2026-11-12, WSL): `formal.sby` and `formal_core.sby`
+  prove all wrapper assertions unbounded (abc pdr, <1 s); `formal_cover.sby`
+  reaches all 3 cover points; `formal_bmc.sby` passes to depth 12 (bitwuzla).
+- **Not run / not applicable:** Quartus (tool absent) and real-board behavior
+  (no Basys3 attached). Vitis is **not applicable** — this is pure RTL on
+  Artix-7 with no ARM/MicroBlaze/HLS software target. The xsim formal snapshot
+  is blocked on this machine by Windows security (freshly built `xsimk.exe`).
+
+---
+
 ## [1.1.0] - 2026-08-10
 
 ### Integration Refinements

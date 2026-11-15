@@ -79,7 +79,7 @@ Mode: Single
 
 #### Error Detection
 ```
-Probe: probe_in2[9] (error_flag)
+Probe: probe_in2[0] (error_flag)
 Condition: == 1
 Mode: Window
 ```
@@ -139,20 +139,19 @@ open_hw_vio -name hw_vio_1
 | `probe_in1` | 31:0 | Current Instruction |
 | `probe_in2` | 31:0 | Control Status |
 
-**Control Status Register (probe_in2) Bit Map**:
+**Control Status Register (probe_in2) Bit Map** (LSB-first):
 | Bit | Name | Description |
 |-----|------|-------------|
-| 31:24 | Reserved | |
-| 23:17 | Opcode | Current instruction opcode |
-| 16 | Branch Taken | Branch condition evaluated true |
-| 15 | Mem Write | Data memory write active |
-| 14 | Mem Read | Data memory read active |
-| 13 | Reg Write | Register file write active |
-| 12 | Jump Op | JAL/JALR instruction |
-| 11 | Branch Op | Branch instruction |
-| 10 | Processor Active | Non-zero instruction executing |
-| 9 | Error Flag | Illegal opcode detected |
-| 8:0 | Reserved | |
+| 31:15 | Reserved | Tied to 0 |
+| 14:8 | Opcode | Current instruction opcode |
+| 7 | Branch Taken | Branch condition evaluated true |
+| 6 | Mem Write | Data memory write active |
+| 5 | Mem Read | Data memory read active |
+| 4 | Reg Write | Register file write active |
+| 3 | Jump Op | JAL/JALR instruction |
+| 2 | Branch Op | Branch instruction |
+| 1 | Processor Active | Non-zero instruction executing |
+| 0 | Error Flag | Core `trap` (illegal instruction / misaligned / out-of-range) |
 
 ### Runtime Control (Future)
 **Output Probes** (for future use):
@@ -164,8 +163,8 @@ open_hw_vio -name hw_vio_1
 ### Scenario 1: Program Stuck
 **Symptoms**: LEDs static, PC not incrementing
 **Debug Steps**:
-1. Check `processor_active` (probe_in2[10])
-2. Check `error_flag` (probe_in2[9])
+1. Check `processor_active` (probe_in2[1])
+2. Check `error_flag` (probe_in2[0])
 3. Verify `instruction_debug` not 0 or NOP
 4. Check PC sequence in ILA
 
@@ -173,7 +172,7 @@ open_hw_vio -name hw_vio_1
 **Symptoms**: Wrong PC after branch
 **Debug Steps**:
 1. Trigger on `branch_taken_debug` (probe12)
-2. Check `branch_op` (probe_in2[11])
+2. Check `branch_op` (probe_in2[2])
 3. Verify ALU result (probe2) and branch condition
 4. Check PC before/after branch
 
@@ -188,9 +187,9 @@ open_hw_vio -name hw_vio_1
 ### Scenario 4: Illegal Instruction
 **Symptoms**: `error_flag` asserted
 **Debug Steps**:
-1. Trigger on `error_flag` (probe_in2[9])
+1. Trigger on `error_flag` (probe_in2[0])
 2. Capture `instruction_debug` (probe1)
-3. Decode opcode (probe_in2[23:17])
+3. Decode opcode (probe_in2[14:8])
 4. Verify against ISA table
 
 ## LED Status Interpretation

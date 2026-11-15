@@ -29,9 +29,13 @@ module riscv_processor #(
     output logic            reg_write_debug,
     output logic            mem_read_debug,
     output logic            mem_write_debug,
-    output logic            branch_taken_debug
+    output logic            branch_taken_debug,
+    output logic            trap   // illegal instr / misaligned / out-of-range access
 );
 ```
+
+> **RV32 only:** an elaboration-time guard (`initial if (XLEN != 32) $fatal`)
+> rejects any other `XLEN`.
 
 ### Internal Architecture
 
@@ -94,7 +98,7 @@ pc_next = jump ? jump_target :
 ```systemverilog
 alu_operand1 = alu_src1 ? pc_current : read_data1;
 
-unique case (alu_src)
+case (alu_src)
     2'b00: alu_operand2 = read_data2;   // Register
     2'b01: alu_operand2 = immediate;    // Immediate
     2'b10: alu_operand2 = pc_current;   // PC (for AUIPC)
@@ -105,18 +109,58 @@ endcase
 ### Writeback Selection
 
 ```systemverilog
-unique case (reg_write_src)
-    2'b00: reg_write_data = alu_result;      // ALU result
-    2'b01: reg_write_data = mem_read_data;   // Memory data
-    2'b10: reg_write_data = pc_plus_4;       // PC+4 (JAL/JALR)
-    2'b11: reg_write_data = immediate;       // Immediate (LUI)
-    default: reg_write_data = '0;
-endcase
+// Divide/remainder results come from the sequential divider; everything else
+// uses the reg_write_src mux.
+always_comb begin
+    if (is_div) begin
+        reg_write_data = div_result;
+    end else begin
+        case (reg_write_src)
+            2'b00: reg_write_data = alu_result;      // ALU result
+            2'b01: reg_write_data = mem_read_data;   // Memory data
+            2'b10: reg_write_data = pc_plus_4;       // PC+4 (JAL/JALR)
+            2'b11: reg_write_data = immediate;       // Immediate (LUI)
+            default: reg_write_data = '0;
+        endcase
+    end
+end
 ```
+
+### Multi-cycle Divide Stall (RV32M)
+
+`DIV`/`DIVU`/`REM`/`REMU` are computed by the sequential [Divider](divider.md).
+The core stalls until the result is ready:
+
+```systemverilog
+assign div_start = is_div && !div_busy && !div_done;   // pulse once
+assign div_done  = div_done_pulse | (is_div && div_corner);
+assign pc_hold   = is_div && !div_done;                // freeze PC (program_counter.hold)
+assign reg_write = reg_write_ctrl && (!is_div || div_done);  // write only on done
+```
+
+`is_div` comes from the control unit; `is_signed = ~funct3[0]` and
+`is_remainder = funct3[1]` select the operation. Corner cases (divide-by-zero,
+signed overflow) assert `div_corner` combinationally, so they complete in one
+cycle without stalling. Normal divides take ~32 iterations.
+
+### Trap Detection
+
+```systemverilog
+assign trap = illegal_inst | misalign_access | dmem_addr_oor;
+```
+
+- `illegal_inst`: unknown opcode (all-zero word is a NOP), unsupported R-type
+  funct7, M-extension when `ENABLE_M=0`, or SYSTEM (unimplemented).
+- `misalign_access`: misaligned halfword/word load or store.
+- `dmem_addr_oor`: data access outside the 1 KB memory map (from `data_memory`).
+
+`trap` is an observability signal — the core has no privilege architecture and
+the PC continues; wrappers may halt or light an error LED on it.
 
 ### Inline SVA Assertions
 
-The module includes 15 assertions and 12 cover properties:
+The module includes 14 assertions and 15 cover properties (simulation-only,
+guarded by `` `ifndef IVERILOG ``):
 
 ```systemverilog
 // PC word-aligned
@@ -183,8 +227,7 @@ module riscv_processor_minimal #(
 module riscv_processor_jtag_debug #(
     parameter int XLEN = 32,
     parameter bit ENABLE_M = 1'b1,
-    parameter bit ENABLE_C = 1'b0,
-    parameter int ILA_DEPTH = 1024
+    parameter bit ENABLE_C = 1'b0
 )(
     input  logic        clk,
     input  logic        reset,
@@ -196,9 +239,9 @@ module riscv_processor_jtag_debug #(
 
 ### Explicit ILA Instantiation
 ```systemverilog
-ila_riscv_processor #(
-    .C_DATA_DEPTH (ILA_DEPTH)
-) u_ila (
+// The ILA/VIO IP is generated in-project (build_vivado.tcl); the stubs expose
+// no parameters, so the wrapper instantiates them by name with no overrides.
+ila_riscv_processor u_ila (
     .clk     (clk),
     .probe0  (pc_debug),             // Program Counter
     .probe1  (instruction_debug),    // Current Instruction
@@ -222,7 +265,7 @@ vio_riscv_processor u_vio (
     .clk           (clk),
     .probe_in0     (pc_debug),           // PC Status
     .probe_in1     (instruction_debug),  // Instruction Status
-    .probe_in2     ({24'd0, instruction_debug[6:0], branch_taken_debug, 
+    .probe_in2     ({17'd0, instruction_debug[6:0], branch_taken_debug,
                      mem_write_debug, mem_read_debug, reg_write_debug,
                      jump_op, branch_op, processor_active, error_flag}),
     .probe_out0    (),  // Control Register (reserved)
@@ -242,37 +285,29 @@ vio_riscv_processor u_vio (
 **File**: `src/alu.sv`  
 **Parameters**: `XLEN=32`, `ENABLE_M=1`
 
-### Operations
-| ALU_OP | Operation | Description |
-|--------|-----------|-------------|
-| 4'b0000 | ADD | A + B |
-| 4'b1000 | SUB | A - B |
-| 4'b0111 | AND | A & B |
-| 4'b0110 | OR | A \| B |
-| 4'b0100 | XOR | A ^ B |
-| 4'b0001 | SLL | A << B[4:0] |
-| 4'b0101 | SRL | A >> B[4:0] |
-| 4'b1101 | SRA | \$signed(A) >>> B[4:0] |
-| 4'b0010 | SLT | (\$signed(A) < \$signed(B)) ? 1 : 0 |
-| 4'b0011 | SLTU | (A < B) ? 1 : 0 |
-| 4'b1110 | MUL | \$signed(A) * \$signed(B) [31:0] |
-| 4'b1111 | MULH | \$signed(A) * \$signed(B) [63:32] |
-| 4'b1010 | DIV | \$signed(A) / \$signed(B) |
-| 4'b1011 | REM | \$signed(A) % \$signed(B) |
+See [ALU Reference](alu.md) for the full 5-bit `alu_op_e` operation table. The ALU
+is combinational and covers the base RV32I ops plus the RV32M **multiply** ops
+(MUL/MULH/MULHSU/MULHU). Divide/remainder codes (DIV/DIVU/REM/REMU) return 0 here;
+they are computed by the sequential [Divider](divider.md).
 
 ### Zero Flag
 ```systemverilog
 assign zero = (result == '0);
 ```
 
-### DSP Usage (M-Extension)
-- **MUL/MULH**: 2 DSP48E1 blocks
-- **DIV/REM**: Iterative (uses LUTs)
+### Resource Usage (M-Extension)
+- **MUL/MULH/MULHSU/MULHU**: LUT/CARRY4-based (0 DSP48 blocks in the verified build)
+- **DIV/DIVU/REM/REMU**: sequential restoring divider ([Divider](divider.md)),
+  ~32 cycles with core stall (not combinational)
 
 ## Module: `control_unit`
 
 **File**: `src/control_unit.sv`  
 **Parameters**: `ENABLE_M=1`, `ENABLE_C=0`
+
+In addition to the signals below, the control unit outputs `is_div` (asserted for
+R-type M-extension funct3 ≥ 100 when `ENABLE_M=1`) so the core can stall for the
+sequential divider.
 
 ### Decode Logic
 ```systemverilog
@@ -283,10 +318,10 @@ always_comb begin
     alu_src = ALU_SRC_REG; alu_op = ALU_ADD;
     reg_write_src = WRITE_SRC_ALU;
 
-    unique case (opcode)
+    case (opcode)
         R_TYPE: begin
             reg_write = 1; alu_src = ALU_SRC_REG;
-            unique case ({funct7, funct3})
+            case ({funct7, funct3})
                 {BASE, ADD_SUB}: alu_op = ALU_ADD;    // ADD
                 {SUB_SRA, ADD_SUB}: alu_op = ALU_SUB; // SUB
                 // ... all R-type ops
@@ -294,7 +329,7 @@ always_comb begin
         end
         I_TYPE: begin
             reg_write = 1; alu_src = ALU_SRC_IMM;
-            unique case (funct3)
+            case (funct3)
                 ADD_SUB: alu_op = ALU_ADD;   // ADDI
                 SLT:     alu_op = ALU_SLT;   // SLTI
                 // ... all I-type ops
@@ -309,7 +344,7 @@ always_comb begin
         end
         BRANCH: begin
             branch = 1; alu_src = ALU_SRC_REG;
-            unique case (funct3)
+            case (funct3)
                 BEQ/BNE: alu_op = ALU_SUB;
                 BLT/BGE: alu_op = ALU_SLT;
                 BLTU/BGEU: alu_op = ALU_SLTU;
@@ -368,7 +403,7 @@ assign read_data2 = (read_reg2 == '0) ? '0 : registers[read_reg2];
 always_ff @(posedge clk) begin
     if (reset)
         pc_current <= '0;
-    else
+    else if (!hold)        // hold stalls the PC during a multi-cycle divide
         pc_current <= pc_next;
 end
 ```
@@ -380,7 +415,7 @@ end
 
 ```systemverilog
 always_comb begin
-    unique case (opcode)
+    case (opcode)
         I_TYPE, LOAD, JALR:  // I-type
             immediate = {{(XLEN-12){instruction[31]}}, instruction[31:20]};
         STORE:  // S-type
@@ -388,8 +423,8 @@ always_comb begin
         BRANCH:  // B-type
             immediate = {{(XLEN-13){instruction[31]}}, instruction[31], instruction[7],
                          instruction[30:25], instruction[11:8], 1'b0};
-        LUI, AUIPC:  // U-type
-            immediate = {instruction[31:12], {(XLEN-32){1'b0}}, 12'b0};
+        LUI, AUIPC:  // U-type: upper 20 bits at [31:12], sign-extended to XLEN
+            immediate = {{(XLEN-32){instruction[31]}}, instruction[31:12], 12'b0};
         JAL:  // J-type
             immediate = {{(XLEN-21){instruction[31]}}, instruction[31], instruction[19:12],
                          instruction[20], instruction[30:21], 1'b0};
@@ -434,6 +469,7 @@ See [Memory Architecture](../architecture/memory.md) for detailed documentation.
 |--------|----------------|
 | `riscv_processor` | `XLEN=32`, `ENABLE_M=1`, `ENABLE_C=0` |
 | `alu` | `XLEN=32`, `ENABLE_M=1` |
+| `divider` | `XLEN=32` |
 | `control_unit` | `ENABLE_M=1`, `ENABLE_C=0` |
 | `register_file` | `XLEN=32`, `REG_ADDR_WIDTH=5`, `NUM_REGS=32` |
 | `program_counter` | `XLEN=32` |

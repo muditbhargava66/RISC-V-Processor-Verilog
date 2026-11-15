@@ -1,15 +1,22 @@
 # RISC-V Processor Minimal Constraints File
 # For Xilinx 7-series FPGA (Basys3 board)
-# Reduced I/O for successful implementation
+#
+# Clocking: W5 is the 100 MHz board oscillator. The wrapper divides it by 2
+# (toggle flop + BUFG) to produce the 50 MHz core clock. Timing is constrained
+# on the generated core clock, matching the actual hardware.
 
-# Clock constraint - 50MHz for reliable timing
+# Board clock: 100 MHz oscillator
 set_property PACKAGE_PIN W5 [get_ports clk]
 set_property IOSTANDARD LVCMOS33 [get_ports clk]
-create_clock -period 20.000 -name sys_clk_pin -waveform {0.000 10.000} [get_ports clk]
+create_clock -period 10.000 -name sys_clk_pin [get_ports clk]
 
-# Reset button
+# Generated 50 MHz core clock from the toggle-flop + BUFG divider in the wrapper
+create_generated_clock -name clk_core -source [get_ports clk] -divide_by 2 [get_pins u_clkbuf/O]
+
+# Reset button (asynchronous, active high) - synchronized in the wrapper
 set_property PACKAGE_PIN U18 [get_ports reset]
 set_property IOSTANDARD LVCMOS33 [get_ports reset]
+set_false_path -from [get_ports reset]
 
 # Debug output LEDs (PC debug - lower 16 bits only)
 set_property PACKAGE_PIN U16 [get_ports {pc_debug[0]}]
@@ -28,26 +35,14 @@ set_property PACKAGE_PIN P3 [get_ports {pc_debug[12]}]
 set_property PACKAGE_PIN N3 [get_ports {pc_debug[13]}]
 set_property PACKAGE_PIN P1 [get_ports {pc_debug[14]}]
 set_property PACKAGE_PIN L1 [get_ports {pc_debug[15]}]
-
 set_property IOSTANDARD LVCMOS33 [get_ports {pc_debug[*]}]
 
-# Timing constraints
-set_input_delay -clock sys_clk_pin -min 0.500 [get_ports reset]
-set_input_delay -clock sys_clk_pin -max 2.000 [get_ports reset]
-
-# Output delay constraints for debug signals
-set_output_delay -clock sys_clk_pin -min 0.500 [get_ports {pc_debug[*]}]
-set_output_delay -clock sys_clk_pin -max 3.000 [get_ports {pc_debug[*]}]
-
-# Set false paths for debug outputs to relax timing
+# LEDs are asynchronous status outputs - no timing requirement
 set_false_path -to [get_ports {pc_debug[*]}]
 
-# Clock uncertainty
-set_clock_uncertainty -setup 0.100 [get_clocks sys_clk_pin]
-set_clock_uncertainty -hold 0.050 [get_clocks sys_clk_pin]
-
-# Set maximum delay for internal paths
-set_max_delay -from [get_clocks sys_clk_pin] -to [get_clocks sys_clk_pin] 19.500
+# Clock uncertainty on the core clock
+set_clock_uncertainty -setup 0.100 [get_clocks clk_core]
+set_clock_uncertainty -hold 0.050 [get_clocks clk_core]
 
 # I/O voltage configuration for bitstream generation
 set_property CFGBVS VCCO [current_design]

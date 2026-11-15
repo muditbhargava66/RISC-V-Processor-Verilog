@@ -27,7 +27,7 @@ In `src/immediate_generator.sv`:
 
 ```systemverilog
 always_comb begin
-    unique case (opcode)
+    case (opcode)
         // ... existing cases
         OPCODE_NEW: begin
             // Define immediate format
@@ -43,7 +43,7 @@ In `src/control_unit.sv`:
 
 ```systemverilog
 always_comb begin
-    unique case (opcode)
+    case (opcode)
         OPCODE_NEW: begin
             reg_write      = 1'b1;
             alu_src        = ALU_SRC_IMM;
@@ -63,7 +63,7 @@ In `src/alu.sv`:
 localparam logic [3:0] ALU_NEW_OP = 4'bxxxx;
 
 always_comb begin
-    unique case (alu_control)
+    case (alu_control)
         ALU_NEW_OP: begin
             result = custom_operation(operand_a, operand_b);
         end
@@ -206,7 +206,7 @@ end
 ```systemverilog
 OPCODE_CSR: begin
     reg_write = 1'b1;
-    unique case (funct3)
+    case (funct3)
         FUNCT3_CSRRW: alu_op = ALU_CSRRW;  // New ALU op
         FUNCT3_CSRRS: alu_op = ALU_CSRRS;
         FUNCT3_CSRRC: alu_op = ALU_CSRRC;
@@ -223,7 +223,7 @@ localparam logic [3:0] ALU_CSRRS = 4'b1101;
 localparam logic [3:0] ALU_CSRRC = 4'b1110;
 
 always_comb begin
-    unique case (alu_control)
+    case (alu_control)
         ALU_CSRRW: result = csr_read_data;  // Write rs1, return old
         ALU_CSRRS: result = csr_read_data | operand_a;  // Set bits
         ALU_CSRRC: result = csr_read_data & ~operand_a; // Clear bits
